@@ -1,0 +1,26 @@
+import axios from "axios";
+
+const API_BASE_URL = "http://localhost:8000/api/v1";
+
+export async function executeTest({ url }) {
+  const response = await axios.post(`${API_BASE_URL}/tests/execute`, {
+    url,
+    title: "ATe 테스트",
+    steps: [
+      {
+        action: "goto",
+        value: url,
+      },
+      {
+        action: "screenshot",
+      },
+    ],
+  });
+
+  return response.data;
+}
+
+export async function getTestResult(testRunId) {
+  const response = await axios.get(`${API_BASE_URL}/tests/${testRunId}`);
+  return response.data;
+}
