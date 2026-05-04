@@ -568,13 +568,24 @@ proxy_set_header Upgrade $http_upgrade;
 proxy_set_header Connection "upgrade";
 ```
 
-### "테스트 실행 컨테이너 생성 실패"
+### "테스트 실행이 즉시 실패한다"
 
-worker에 Docker 소켓이 마운트됐는지 확인:
-```yaml
-volumes:
-  - /var/run/docker.sock:/var/run/docker.sock
+워커 컨테이너 안에서 Playwright가 제대로 설치됐는지 확인:
+```bash
+docker compose exec worker npx playwright --version
+docker compose exec worker which node
 ```
+
+응답이 안 나오면 워커 이미지를 다시 빌드:
+```bash
+docker compose build --no-cache worker
+docker compose up -d
+```
+
+### "워커 빌드가 너무 느리다"
+
+Playwright 베이스 이미지(약 1.5GB) 다운로드 때문에 첫 빌드만 5~15분 걸립니다.
+이후 빌드는 캐시 덕분에 1분 미만입니다.
 
 ---
 

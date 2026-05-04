@@ -1,0 +1,10 @@
+{
+  "name": "ate-playwright-runner",
+  "version": "1.0.0",
+  "description": "Playwright runner inside ATe worker",
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "1.47.0",
+    "typescript": "5.5.4"
+  }
+}

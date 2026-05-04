@@ -87,16 +87,16 @@ services:
       - REDIS_URL=redis://broker:6379/0
       - CELERY_BROKER_URL=redis://broker:6379/1
       - CELERY_RESULT_BACKEND=redis://broker:6379/2
-      - DOCKER_HOST=unix:///var/run/docker.sock
       - AI_SERVICE_URL=${AI_SERVICE_URL:-http://ai-service:9000}
       - AI_SERVICE_TIMEOUT=${AI_SERVICE_TIMEOUT:-60}
       - AI_SERVICE_MOCK=${AI_SERVICE_MOCK:-false}
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - PLAYWRIGHT_RUNNER_DIR=/app/playwright-runner
     volumes:
       - ./backend:/app/backend
       - ./worker:/app/worker
       - ./common:/app/common
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: celery -A main.celery_app worker --loglevel=info --queues=test_execution,ai_generation,default --concurrency=4
+    command: celery -A main.celery_app worker --loglevel=info --queues=test_execution,ai_generation,default --concurrency=2
 
   # ━━━━━━━━━━ Presentation Tier ━━━━━━━━━━
   frontend:

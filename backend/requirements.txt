@@ -22,9 +22,6 @@ websockets==12.0
 pydantic==2.9.2
 pydantic-settings==2.5.2
 
-# Docker SDK (Worker)
-docker==7.1.0
-
 # Allure
 allure-pytest==2.13.5
 

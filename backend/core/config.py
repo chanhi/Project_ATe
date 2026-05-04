@@ -36,9 +36,9 @@ class Settings(BaseSettings):
     WS_HEARTBEAT_INTERVAL: int = 30
     WS_MAX_CONNECTIONS: int = 100
 
-    # ── Docker Worker ──
-    DOCKER_HOST: str = "unix:///var/run/docker.sock"
-    WORKER_IMAGE: str = "ate-playwright-worker:latest"
+    # ── Worker ──
+    # 옵션 2: 워커 컨테이너 안에서 직접 Playwright 실행
+    # (DOCKER_HOST, WORKER_IMAGE는 더 이상 필요 없음)
     WORKER_TIMEOUT: int = 300
 
     # ── AI ──
