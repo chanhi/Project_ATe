@@ -1,26 +1,60 @@
-import axios from "axios";
+import axios from 'axios';
 
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = 'http://localhost:8000/api/v1';
 
-export async function executeTest({ url }) {
-  const response = await axios.post(`${API_BASE_URL}/tests/execute`, {
-    url,
-    title: "ATe 테스트",
-    steps: [
-      {
-        action: "goto",
-        value: url,
-      },
-      {
-        action: "screenshot",
-      },
-    ],
-  });
+const testApi = {
+  /**
+   * [명세서 1번] 프로젝트 목록 조회
+   */
+  getProjects: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/projects`);
+      return response.data;
+    } catch (error) {
+      console.error("Project List Error:", error);
+      throw error;
+    }
+  },
 
-  return response.data;
-}
+  /**
+   * [명세서 2번] 프로젝트 생성
+   */
+  createProject: async (projectData) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/projects`, projectData);
+      return response.data;
+    } catch (error) {
+      console.error("Project Create Error:", error);
+      throw error;
+    }
+  },
 
-export async function getTestResult(testRunId) {
-  const response = await axios.get(`${API_BASE_URL}/tests/${testRunId}`);
-  return response.data;
-}
+  /**
+   * [명세서 3번] 프로젝트 상세 조회
+   */
+  getProjectDetail: async (projectId) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/projects/${projectId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Project Detail Error:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * [기존 기능] 테스트 즉시 실행 (AI 에이전트 호출)
+   * 명세서 8번에 해당
+   */
+  executeInstantTest: async (testData) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/tests/execute`, testData);
+      return response.data;
+    } catch (error) {
+      console.error("Execution Error:", error);
+      throw error;
+    }
+  }
+};
+
+export default testApi;
