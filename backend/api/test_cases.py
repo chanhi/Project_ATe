@@ -204,6 +204,94 @@ async def generate_test_cases(request: TestCaseGenerateRequest):
         ),
     )
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  직접 케이스 생성 (AI 없이, 데모/논문 시연용)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.post(
+    "",
+    response_model=APIResponse,
+    status_code=201,
+    summary="테스트 케이스 직접 생성 (AI 거치지 않음)",
+)
+async def create_test_case_direct(request: dict):
+    """
+    Playwright 코드를 직접 가지고 케이스를 만든다.
+
+    AI를 거치지 않으므로:
+    - placeholder 단계 없음
+    - mock/실제 AI 호출 없음
+    - 즉시 사용 가능한 완성된 케이스 생성
+
+    데모/논문 시연/스크린샷 생성에 적합.
+
+    필수 필드:
+    - project_id: 프로젝트 ID
+    - title: 케이스 제목
+    - playwright_code: 실행할 Playwright 코드
+
+    선택 필드:
+    - description, technique, category, priority
+    - target_urls, steps, expected_result
+    """
+    test_cases = get_test_cases_collection()
+    projects = get_projects_collection()
+
+    # 필수 필드 검증
+    project_id = request.get("project_id")
+    title = request.get("title")
+    playwright_code = request.get("playwright_code")
+
+    if not project_id:
+        raise HTTPException(status_code=400, detail="project_id 필수")
+    if not title:
+        raise HTTPException(status_code=400, detail="title 필수")
+    if not playwright_code:
+        raise HTTPException(status_code=400, detail="playwright_code 필수")
+
+    # 프로젝트 존재 확인
+    project = await projects.find_one({"project_id": project_id})
+    if not project:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "error",
+                "message": f"프로젝트를 찾을 수 없음: {project_id}",
+                "error_code": "PROJECT_NOT_FOUND",
+            },
+        )
+
+    # 케이스 생성
+    test_case_id = f"tc-{uuid.uuid4().hex[:8]}"
+    target_urls = request.get("target_urls") or [project.get("base_url", "")]
+
+    tc_doc = {
+        "test_case_id": test_case_id,
+        "project_id": project_id,
+        "title": title,
+        "description": request.get("description"),
+        "technique": request.get("technique", "scenario_based"),
+        "category": request.get("category"),
+        "priority": request.get("priority", "medium"),
+        "precondition": request.get("precondition"),
+        "steps": request.get("steps", []),
+        "expected_result": request.get("expected_result"),
+        "playwright_code": playwright_code,
+        "target_urls": target_urls,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await test_cases.insert_one(tc_doc)
+
+    return APIResponse(
+        status="success",
+        data={
+            "test_case_id": test_case_id,
+            "title": title,
+            "ready_to_execute": True,
+        },
+        message=f"케이스가 직접 생성되었습니다. POST /test-cases/{test_case_id}/execute로 실행하세요.",
+    )
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  CRUD
