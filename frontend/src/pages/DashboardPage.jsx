@@ -69,9 +69,8 @@ const DashboardPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {techData.map((item, idx) => (
                   <div key={idx} className="bg-slate-50 p-8 rounded-3xl transition-all hover:bg-indigo-50">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{item.technique_name}</p>
-                    <p className="text-3xl font-black text-slate-800">{item.case_count} <span className="text-xs text-slate-400 font-medium">Cases</span></p>
-                  </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{item.technique}</p>
+                    <p className="text-3xl font-black text-slate-800">{item.count} <span className="text-xs text-slate-400 font-medium">Cases</span></p></div>
                 ))}
               </div>
             ) : (
