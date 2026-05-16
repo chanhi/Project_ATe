@@ -63,7 +63,7 @@ const ExecuteRunPage = () => {
       // 이미지 명세의 '방식 1: Step DSL' 구조를 적용합니다.
       const response = await client.post('/api/v1/tests/execute', {
         title: "Adhoc Test",
-        url: "http://localhost:5173", // 대상 URL
+        url: "http://host.docker.internal:5173", // 대상 URL
         steps: [
           { action: "fill", target: "#username", value: "admin" },
           { action: "fill", target: "#password", value: "1234" },

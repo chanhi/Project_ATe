@@ -36,7 +36,7 @@ const ScenarioGeneratePage = () => {
         document_id: documentId,        // 1. 기획서 ID 사용
         nl_input: requirements,        // 2. 자연어 입력 전달
         techniques: ["scenario_based"], // 3. 시나리오 기반 기법 선택
-        target_urls: ["http://localhost:5173"] // 4. 테스트 대상 URL
+        target_urls: ["http://host.docker.internal:5173"] // 4. 테스트 대상 URL
       };
 
       // 테스트 케이스 생성 엔진 호출

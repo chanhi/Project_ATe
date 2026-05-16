@@ -92,6 +92,7 @@ services:
       - AI_SERVICE_MOCK=${AI_SERVICE_MOCK:-false}
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
       - PLAYWRIGHT_RUNNER_DIR=/app/playwright-runner
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - ./backend:/app/backend
       - ./worker:/app/worker

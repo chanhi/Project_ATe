@@ -1,19 +1,13 @@
 """
 AI 생성 Celery Tasks
 ────────────────────
-AI팀 서버 호출은 LLM 응답을 기다려야 해서 5~30초 걸린다.
-HTTP 요청 안에서 동기로 처리하면 타임아웃 위험이 크므로 Celery Task로 위임.
-
-진행상황은 기존 WebSocket 인프라(/ws/v1/tests/{job_id}/logs)를 그대로 재사용한다.
-job_id가 test_run_id 자리에 들어간다고 보면 된다.
-
-Task 2개:
-- generate_test_cases_task   : 자연어/기획서 → 케이스 + Playwright 코드 (신규)
-- regenerate_code_task       : 기존 케이스 + 새 URL → 새 Playwright 코드 (재사용)
+자연어/기획서 입력을 받아 OpenAI 기반 ATEAiEngine으로
+테스트 케이스와 Playwright 코드를 생성한다.
 """
 
 import json
 import logging
+import asyncio
 from datetime import datetime, timezone
 
 import redis as sync_redis
@@ -21,18 +15,14 @@ from pymongo import MongoClient
 
 from core.celery_app import celery_app
 from core.config import get_settings
-from core.ai_client import (
-    AIServiceError,
-    call_generate_cases,
-    call_regenerate_code,
-)
+from core.ai_engine2 import ATEAiEngine
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  공용 유틸
+# 공용 유틸
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def _get_sync_redis():
@@ -45,34 +35,102 @@ def _get_sync_mongo():
 
 
 def _publish_progress(r, job_id, level, message, progress):
-    """
-    진행상황을 Redis Pub/Sub으로 발행한다.
-    프론트는 ws://.../ws/v1/tests/{job_id}/logs 로 구독하면 됨.
-    """
     log_entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "level": level,
         "message": message,
         "progress_percentage": progress,
     }
+
     payload = json.dumps(log_entry, ensure_ascii=False)
+
     r.publish(f"test_log:{job_id}", payload)
     r.rpush(f"test_log_list:{job_id}", payload)
     r.expire(f"test_log_list:{job_id}", 86400)
 
 
 def _update_job_status(r, job_id, status, **extra):
-    """job 상태를 Redis Hash에 저장 (test_run과 동일한 구조)"""
     key = f"test_run:{job_id}"
-    data = {"status": status, "job_type": extra.pop("job_type", "ai_generation")}
+
+    data = {
+        "status": status,
+        "job_type": extra.pop("job_type", "ai_generation"),
+    }
+
     for k, v in extra.items():
         data[k] = str(v)
+
     r.hset(key, mapping=data)
     r.expire(key, 86400)
 
 
+def _safe_async_run(coro):
+    """
+    Celery sync task 안에서 async 함수를 안전하게 실행하기 위한 헬퍼.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+
+        if loop.is_running():
+            new_loop = asyncio.new_event_loop()
+            try:
+                return new_loop.run_until_complete(coro)
+            finally:
+                new_loop.close()
+
+        return loop.run_until_complete(coro)
+
+    except RuntimeError:
+        return asyncio.run(coro)
+
+
+def _build_ai_case(
+    ai_result: dict,
+    technique: str,
+    nl_input: str | None,
+    target_url: str,
+):
+    generated_code = ai_result.get("generated_code", "")
+
+    validation = ai_result.get("ai_validation", {})
+    status = validation.get("status", "UNKNOWN")
+
+    title = f"[{technique}] AI 생성 테스트"
+
+    description = (
+        f"기법: {technique} | 입력 요약: {nl_input or ''}"
+    )
+
+    return {
+        "title": title,
+        "description": description,
+        "precondition": f"대상 URL에 접속 가능해야 함: {target_url}",
+        "steps": [
+            {
+                "order": 1,
+                "action": "goto",
+                "target": target_url,
+                "value": "",
+            },
+            {
+                "order": 2,
+                "action": "ai_generated",
+                "target": "playwright_code",
+                "value": "AI가 생성한 Playwright 코드 실행",
+            },
+        ],
+        "expected_result": "AI가 생성한 Playwright 테스트 코드가 정상 생성되어야 함",
+        "priority": "medium",
+        "category": "ai_generated",
+        "technique": technique,
+        "playwright_code": generated_code,
+        "ai_validation": validation,
+        "status": status,
+    }
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  Task 1: 신규 케이스 생성 (처음 요청용)
+# Task 1: 신규 케이스 생성
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @celery_app.task(
@@ -85,7 +143,7 @@ def _update_job_status(r, job_id, status, **extra):
 def generate_test_cases_task(
     self,
     job_id: str,
-    placeholder_case_ids: list[str],     # 사전에 만들어둔 빈 케이스 ID들
+    placeholder_case_ids: list[str],
     project_id: str,
     nl_input: str | None,
     document_id: str | None,
@@ -93,63 +151,101 @@ def generate_test_cases_task(
     target_url: str,
     techniques: list[str],
 ) -> dict:
-    """
-    AI팀 서버에 신규 케이스 + Playwright 코드 생성 요청.
-    응답을 받아서 사전에 만들어둔 placeholder 케이스에 채워넣는다.
-    """
     r = _get_sync_redis()
     mongo_client, db = _get_sync_mongo()
 
     try:
-        _update_job_status(r, job_id, "RUNNING", started_at=datetime.now(timezone.utc).isoformat(),
-                          job_type="ai_generation")
+        _update_job_status(
+            r,
+            job_id,
+            "RUNNING",
+            started_at=datetime.now(timezone.utc).isoformat(),
+            job_type="ai_generation",
+        )
         _publish_progress(r, job_id, "INFO", "AI 케이스 생성 요청 시작", 0)
 
-        # 프로젝트 정보 조회
         project = db.projects.find_one({"project_id": project_id})
-        project_context = {
-            "name": project["name"] if project else "",
-            "base_url": project["base_url"] if project else target_url,
-        }
+        base_url = target_url or (project.get("base_url") if project else "")
 
-        _publish_progress(r, job_id, "INFO",
-                         f"AI 서비스 호출 중... ({len(techniques)}개 기법)", 20)
+        prompt_source = nl_input or document_text or ""
+        if not prompt_source.strip():
+            raise ValueError("자연어 입력 또는 문서 텍스트가 비어 있습니다.")
 
-        # AI팀 호출
-        try:
-            ai_cases = call_generate_cases(
-                nl_input=nl_input,
-                document_text=document_text,
-                target_url=target_url,
-                techniques=techniques,
-                project_context=project_context,
+        if not techniques:
+            techniques = ["scenario_based"]
+
+        _publish_progress(
+            r,
+            job_id,
+            "INFO",
+            f"OpenAI 기반 AI 엔진 호출 중... ({len(techniques)}개 기법)",
+            20,
+        )
+
+        engine = ATEAiEngine()
+        ai_cases = []
+
+        for idx, technique in enumerate(techniques):
+            ai_result = _safe_async_run(
+                engine.generate_playwright_test(
+                    project_id=project_id,
+                    base_url=base_url,
+                    nl_prompt=prompt_source,
+                    technique=technique,
+                )
             )
-        except AIServiceError as e:
-            _publish_progress(r, job_id, "ERROR", f"AI 서비스 실패: {str(e)}", 100)
-            _update_job_status(r, job_id, "FAILED", error_log=str(e))
-            raise self.retry(exc=e)
 
-        _publish_progress(r, job_id, "INFO",
-                         f"AI 응답 수신 ({len(ai_cases)}개 케이스). DB 저장 중...", 70)
+            validation = ai_result.get("ai_validation", {})
+            if not validation.get("is_valid"):
+                raise RuntimeError(
+                    validation.get("message", "AI 테스트 코드 생성 실패")
+                )
 
-        # 응답 케이스를 사전에 만든 placeholder에 매핑하여 업데이트
-        # 케이스 수가 다를 수 있으므로 짝을 맞춤
+            ai_case = _build_ai_case(
+                ai_result=ai_result,
+                technique=technique,
+                nl_input=nl_input,
+                target_url=base_url,
+            )
+            ai_cases.append(ai_case)
+
+            progress = 20 + int(((idx + 1) / len(techniques)) * 45)
+            _publish_progress(
+                r,
+                job_id,
+                "INFO",
+                f"{technique} 기법 테스트 생성 완료",
+                progress,
+            )
+
+        _publish_progress(
+            r,
+            job_id,
+            "INFO",
+            f"AI 응답 수신 ({len(ai_cases)}개 케이스). DB 저장 중...",
+            70,
+        )
+
         updated_count = 0
+        generated_ids = []
+
         for i, ai_case in enumerate(ai_cases):
             if i < len(placeholder_case_ids):
                 tc_id = placeholder_case_ids[i]
             else:
-                # AI가 더 많이 생성한 경우 → 새 ID 발급
                 import uuid
+
                 tc_id = f"tc-{uuid.uuid4().hex[:8]}"
-                db.test_cases.insert_one({
-                    "test_case_id": tc_id,
-                    "project_id": project_id,
-                    "document_id": document_id,
-                    "target_urls": [target_url],
-                    "created_at": datetime.now(timezone.utc),
-                    "updated_at": datetime.now(timezone.utc),
-                })
+                db.test_cases.insert_one(
+                    {
+                        "test_case_id": tc_id,
+                        "project_id": project_id,
+                        "document_id": document_id,
+                        "target_urls": [base_url],
+                        "created_at": datetime.now(timezone.utc),
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+                )
 
             update_fields = {
                 "title": ai_case.get("title", "(제목 없음)"),
@@ -161,46 +257,81 @@ def generate_test_cases_task(
                 "category": ai_case.get("category"),
                 "technique": ai_case.get("technique"),
                 "playwright_code": ai_case.get("playwright_code"),
+                "ai_validation": ai_case.get("ai_validation"),
+                "target_urls": [base_url],
                 "updated_at": datetime.now(timezone.utc),
             }
+
             db.test_cases.update_one(
                 {"test_case_id": tc_id},
                 {"$set": update_fields},
             )
+
+            generated_ids.append(tc_id)
             updated_count += 1
 
-        # 사용되지 않은 placeholder 정리 (AI가 적게 생성한 경우)
         unused = placeholder_case_ids[len(ai_cases):]
         if unused:
             db.test_cases.delete_many({"test_case_id": {"$in": unused}})
-            _publish_progress(r, job_id, "WARN",
-                            f"AI가 케이스를 적게 생성하여 {len(unused)}개 placeholder 삭제됨", 85)
+            _publish_progress(
+                r,
+                job_id,
+                "WARN",
+                f"AI가 케이스를 적게 생성하여 {len(unused)}개 placeholder 삭제됨",
+                85,
+            )
 
-        _publish_progress(r, job_id, "SUCCESS",
-                         f"✅ {updated_count}개 케이스 생성 완료", 100)
-        _update_job_status(r, job_id, "SUCCESS",
-                          ended_at=datetime.now(timezone.utc).isoformat(),
-                          generated_count=updated_count)
+        _publish_progress(
+            r,
+            job_id,
+            "SUCCESS",
+            f"✅ {updated_count}개 케이스 생성 완료",
+            100,
+        )
+
+        _update_job_status(
+            r,
+            job_id,
+            "SUCCESS",
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            generated_count=updated_count,
+            generated_test_case_ids=json.dumps(generated_ids),
+        )
 
         return {
             "job_id": job_id,
             "status": "SUCCESS",
-            "generated_test_case_ids": placeholder_case_ids[:len(ai_cases)],
+            "generated_test_case_ids": generated_ids,
             "count": updated_count,
         }
 
     except Exception as exc:
         logger.exception("AI 생성 실패: job_id=%s", job_id)
-        _publish_progress(r, job_id, "ERROR", f"내부 에러: {str(exc)}", 100)
-        _update_job_status(r, job_id, "FAILED", error_log=str(exc),
-                          ended_at=datetime.now(timezone.utc).isoformat())
+
+        _publish_progress(
+            r,
+            job_id,
+            "ERROR",
+            f"내부 에러: {str(exc)}",
+            100,
+        )
+
+        _update_job_status(
+            r,
+            job_id,
+            "FAILED",
+            error_log=str(exc),
+            ended_at=datetime.now(timezone.utc).isoformat(),
+        )
+
         raise self.retry(exc=exc)
+
     finally:
         mongo_client.close()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  Task 2: 재사용용 코드 재생성
+# Task 2: 코드 재생성
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @celery_app.task(
@@ -216,92 +347,121 @@ def regenerate_code_task(
     test_case_id: str,
     new_target_url: str,
 ) -> dict:
-    """
-    기존 테스트 케이스를 새 URL용 Playwright 코드로 재생성.
-
-    동작:
-    1. test_case 조회 (steps + 메타정보)
-    2. AI팀에게 새 URL용 코드 재생성 요청
-    3. 결과를 새 형태로 저장 — 기존 케이스의 target_urls에 추가하고
-       playwright_code는 URL별로 보존하기 위해 별도 컬렉션 또는 dict 구조 사용
-    """
     r = _get_sync_redis()
     mongo_client, db = _get_sync_mongo()
 
     try:
-        _update_job_status(r, job_id, "RUNNING",
-                          started_at=datetime.now(timezone.utc).isoformat(),
-                          job_type="ai_regeneration")
+        _update_job_status(
+            r,
+            job_id,
+            "RUNNING",
+            started_at=datetime.now(timezone.utc).isoformat(),
+            job_type="ai_regeneration",
+        )
         _publish_progress(r, job_id, "INFO", "재생성 요청 시작", 0)
 
-        # 기존 케이스 조회
         tc = db.test_cases.find_one({"test_case_id": test_case_id})
         if not tc:
             raise ValueError(f"테스트 케이스 없음: {test_case_id}")
 
         old_url = tc.get("target_urls", [None])[0] if tc.get("target_urls") else None
 
-        _publish_progress(r, job_id, "INFO",
-                         f"AI 재생성 호출 중... ({old_url} → {new_target_url})", 30)
+        _publish_progress(
+            r,
+            job_id,
+            "INFO",
+            f"AI 재생성 호출 중... ({old_url} → {new_target_url})",
+            30,
+        )
 
-        # AI팀 호출
-        try:
-            result = call_regenerate_code(
-                test_case={
-                    "title": tc.get("title"),
-                    "steps": tc.get("steps", []),
-                    "expected_result": tc.get("expected_result"),
-                    "playwright_code": tc.get("playwright_code"),
-                },
-                new_target_url=new_target_url,
-                old_target_url=old_url,
+        engine = ATEAiEngine()
+
+        original_code = tc.get("playwright_code") or ""
+        prompt = (
+            f"다음 기존 테스트 케이스를 새 URL에 맞게 Playwright 코드로 재생성해줘.\n"
+            f"제목: {tc.get('title')}\n"
+            f"설명: {tc.get('description')}\n"
+            f"기존 URL: {old_url}\n"
+            f"새 URL: {new_target_url}\n"
+            f"기존 코드:\n{original_code}"
+        )
+
+        ai_result = _safe_async_run(
+            engine.generate_playwright_test(
+                project_id=tc.get("project_id", ""),
+                base_url=new_target_url,
+                nl_prompt=prompt,
+                technique=tc.get("technique", "scenario_based"),
             )
-        except AIServiceError as e:
-            _publish_progress(r, job_id, "ERROR", f"AI 재생성 실패: {str(e)}", 100)
-            _update_job_status(r, job_id, "FAILED", error_log=str(e))
-            raise self.retry(exc=e)
+        )
+
+        validation = ai_result.get("ai_validation", {})
+        if not validation.get("is_valid"):
+            raise RuntimeError(validation.get("message", "AI 재생성 실패"))
+
+        new_code = ai_result.get("generated_code", "")
 
         _publish_progress(r, job_id, "INFO", "재생성 완료. URL별 코드 저장 중...", 80)
 
-        # URL별 Playwright 코드를 저장
-        # 구조: playwright_code_per_url = { "https://shopA.com": "...", "https://shopB.com": "..." }
         url_codes = tc.get("playwright_code_per_url", {})
-        if not url_codes and tc.get("playwright_code") and old_url:
-            # 처음 재생성하는 경우 기존 코드를 url_codes로 옮김
-            url_codes[old_url] = tc["playwright_code"]
-        url_codes[new_target_url] = result["playwright_code"]
+        if not url_codes and original_code and old_url:
+            url_codes[old_url] = original_code
 
-        # target_urls 갱신
+        url_codes[new_target_url] = new_code
+
         target_urls = list(set(tc.get("target_urls", []) + [new_target_url]))
 
         db.test_cases.update_one(
             {"test_case_id": test_case_id},
-            {"$set": {
-                "playwright_code_per_url": url_codes,
-                "target_urls": target_urls,
-                "updated_at": datetime.now(timezone.utc),
-            }},
+            {
+                "$set": {
+                    "playwright_code": new_code,
+                    "playwright_code_per_url": url_codes,
+                    "target_urls": target_urls,
+                    "ai_validation": validation,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
         )
 
         _publish_progress(r, job_id, "SUCCESS", "✅ 재생성 완료", 100)
-        _update_job_status(r, job_id, "SUCCESS",
-                          ended_at=datetime.now(timezone.utc).isoformat(),
-                          test_case_id=test_case_id,
-                          new_target_url=new_target_url)
+
+        _update_job_status(
+            r,
+            job_id,
+            "SUCCESS",
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            test_case_id=test_case_id,
+            new_target_url=new_target_url,
+        )
 
         return {
             "job_id": job_id,
             "status": "SUCCESS",
             "test_case_id": test_case_id,
             "new_target_url": new_target_url,
-            "notes": result.get("notes"),
         }
 
     except Exception as exc:
         logger.exception("재생성 실패: job_id=%s", job_id)
-        _publish_progress(r, job_id, "ERROR", f"내부 에러: {str(exc)}", 100)
-        _update_job_status(r, job_id, "FAILED", error_log=str(exc),
-                          ended_at=datetime.now(timezone.utc).isoformat())
+
+        _publish_progress(
+            r,
+            job_id,
+            "ERROR",
+            f"내부 에러: {str(exc)}",
+            100,
+        )
+
+        _update_job_status(
+            r,
+            job_id,
+            "FAILED",
+            error_log=str(exc),
+            ended_at=datetime.now(timezone.utc).isoformat(),
+        )
+
         raise self.retry(exc=exc)
+
     finally:
         mongo_client.close()

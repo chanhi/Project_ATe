@@ -20,6 +20,8 @@ from core.mongo import init_mongo, close_mongo
 from core.redis_client import init_redis, close_redis
 from core.celery_app import celery_app  # noqa: F401 (Celery autodiscover용)
 from websocket.handler import router as ws_router, get_active_connection_count
+from fastapi.middleware.cors import CORSMiddleware
+
 
 settings = get_settings()
 
@@ -55,14 +57,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

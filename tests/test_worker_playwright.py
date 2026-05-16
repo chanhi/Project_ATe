@@ -161,7 +161,7 @@ class TestWorkerDockerfile:
     def test_uses_playwright_base_image(self):
         repo_root = Path(__file__).resolve().parent.parent
         dockerfile = repo_root / "worker" / "Dockerfile"
-        content = dockerfile.read_text()
+        content = dockerfile.read_text(encoding="utf-8")
 
         assert "playwright" in content.lower()
         assert "FROM mcr.microsoft.com/playwright" in content
@@ -169,7 +169,7 @@ class TestWorkerDockerfile:
     def test_python_installed(self):
         repo_root = Path(__file__).resolve().parent.parent
         dockerfile = repo_root / "worker" / "Dockerfile"
-        content = dockerfile.read_text()
+        content = dockerfile.read_text(encoding="utf-8")
 
         # Playwright 이미지에 Python 추가됐는지
         assert "python3.12" in content or "python3" in content
