@@ -81,6 +81,7 @@ services:
     restart: unless-stopped
     networks:
       - backend_net
+      - frontend_net
     environment:
       - MONGO_URL=mongodb://${DB_USER}:${DB_PASSWORD}@database:27017/${DB_NAME}?authSource=admin
       - DB_NAME=${DB_NAME}
@@ -111,6 +112,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/dist:/usr/share/nginx/html:ro
 
 volumes:
   redis_data:

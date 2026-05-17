@@ -44,15 +44,20 @@ async def get_summary(project_id: str | None = Query(None)):
     tc_query = {"project_id": project_id} if project_id else {}
     total_cases = await test_cases.count_documents(tc_query)
 
-    # 프로젝트 기반 run 필터 (test_case → test_run 조인)
+    # 프로젝트 기반 run 필터
     run_query = {}
     if project_id:
         case_ids = await test_cases.distinct("test_case_id", tc_query)
-        run_query = {"test_case_id": {"$in": case_ids}} if case_ids else {"test_case_id": {"$in": []}}
+        # test_case_id 기반 run + adhoc run 모두 포함
+        run_query = {
+            "$or": [
+                {"test_case_id": {"$in": case_ids}},
+                {"scenario_id": {"$regex": "^adhoc-"}},
+            ]
+        } if case_ids else {"scenario_id": {"$regex": "^adhoc-"}}
 
     total_runs = await test_runs.count_documents(run_query)
 
-    # 기존 워커는 SUCCESS/FAILED를 사용, v2에서는 PASSED/FAILED/ERROR 사용 → 둘 다 카운트
     passed = await test_runs.count_documents({**run_query, "status": {"$in": ["PASSED", "SUCCESS"]}})
     failed = await test_runs.count_documents({**run_query, "status": "FAILED"})
     error = await test_runs.count_documents({**run_query, "status": "ERROR"})
@@ -103,10 +108,18 @@ async def get_recent_runs(
     query = {}
     if project_id:
         case_ids = await test_cases.distinct("test_case_id", {"project_id": project_id})
-        query["test_case_id"] = {"$in": case_ids} if case_ids else {"$in": []}
+        query = {
+            "$or": [
+                {"test_case_id": {"$in": case_ids}},
+                {"scenario_id": {"$regex": "^adhoc-"}},
+            ]
+        } if case_ids else {"scenario_id": {"$regex": "^adhoc-"}}
 
     if status:
-        query["status"] = status
+        if "$or" in query:
+            query = {"$and": [query, {"status": status}]}
+        else:
+            query["status"] = status
 
     cursor = test_runs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
     runs = await cursor.to_list(length=limit)
@@ -126,7 +139,7 @@ async def get_recent_runs(
         enriched.append({
             "test_run_id": r.get("test_run_id"),
             "test_case_id": tc_id,
-            "title": tc_info.get("title", "(삭제된 케이스)"),
+            "title": tc_info.get("title", "Adhoc Test" if str(tc_id).startswith("adhoc-") else "(삭제된 케이스)"),
             "technique": tc_info.get("technique"),
             "target_url": r.get("target_url"),
             "status": r.get("status"),
@@ -207,27 +220,6 @@ async def list_run_groups(
     summary="Run Group 상세 (대시보드 화면 핵심 API)",
 )
 async def get_run_group_detail(run_group_id: str):
-    """
-    화면의 그 디자인을 그대로 채우는 데이터를 반환한다.
-
-    응답 구조:
-    ```
-    Status: SUCCESS                   ← overall_status
-    Total Tests: 5                    ← total_count
-    Passed: 4 / Failed: 1             ← passed_count, failed_count
-    Duration: 5.2s                    ← total_duration_ms
-
-    Test Case Results
-    ✔ Login Success           PASS    ← runs[].title + status
-    ❌ Get User By ID          FAILED
-
-    Failure Detail (실패 케이스만)
-    Get User By ID                    ← runs[].title
-    Expected: 200 OK                  ← runs[].failure_detail.expected
-    Actual: 404 Not Found             ← runs[].failure_detail.actual
-    Reason: User ID not found         ← runs[].failure_detail.reason
-    ```
-    """
     groups = get_test_run_groups_collection()
     runs_col = get_test_runs_collection()
     cases_col = get_test_cases_collection()
@@ -243,19 +235,16 @@ async def get_run_group_detail(run_group_id: str):
             },
         )
 
-    # datetime 직렬화
     for k in ("created_at", "started_at", "ended_at"):
         if group.get(k):
             group[k] = group[k].isoformat()
 
-    # 그룹에 속한 모든 run 조회
     runs_cursor = runs_col.find(
         {"run_group_id": run_group_id},
         {"_id": 0},
     ).sort("created_at", 1)
     runs = await runs_cursor.to_list(length=None)
 
-    # 각 run의 case 정보(title, technique) 조인
     case_ids = list({r.get("test_case_id") for r in runs if r.get("test_case_id")})
     cases = await cases_col.find(
         {"test_case_id": {"$in": case_ids}},
@@ -263,9 +252,8 @@ async def get_run_group_detail(run_group_id: str):
     ).to_list(length=None)
     case_map = {c["test_case_id"]: c for c in cases}
 
-    # run에 title 등 보강 + datetime 직렬화
     enriched_runs = []
-    failure_details = []  # 실패한 케이스만 따로 모음
+    failure_details = []
 
     for r in runs:
         tc_id = r.get("test_case_id")
@@ -284,7 +272,6 @@ async def get_run_group_detail(run_group_id: str):
         }
         enriched_runs.append(item)
 
-        # 실패 detail 수집
         if r.get("status") in ("FAILED", "ERROR") and r.get("failure_detail"):
             fd = r["failure_detail"]
             failure_details.append({
@@ -295,11 +282,9 @@ async def get_run_group_detail(run_group_id: str):
                 "reason": fd.get("reason"),
             })
 
-    # 응답 구성
     return APIResponse(
         status="success",
         data={
-            # 상단 요약 (화면 윗부분)
             "summary": {
                 "run_group_id": run_group_id,
                 "status": group.get("overall_status"),
@@ -313,11 +298,7 @@ async def get_run_group_detail(run_group_id: str):
                 "started_at": group.get("started_at"),
                 "ended_at": group.get("ended_at"),
             },
-
-            # 케이스별 결과 (중간 리스트)
             "test_cases": enriched_runs,
-
-            # 실패 상세 (하단)
             "failure_details": failure_details,
         },
     )

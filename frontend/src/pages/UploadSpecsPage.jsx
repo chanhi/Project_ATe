@@ -29,20 +29,27 @@ const UploadSpecsPage = () => {
     setIsUploading(true);
     try {
       // 1. 문서 업로드 요청
-      const response = await client.post('/api/v1/documents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+     const response = await client.post('/api/v1/documents/upload', formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+});
 
-      // 백엔드 처리 흐름에 따라 document_id가 발급됩니다.
-      const documentId = response.data.data?.document_id;
-      alert("기획서 업로드 성공! AI가 문서를 파싱하고 있습니다.");
-      
-      // 2. 분석 완료 후 시나리오 생성 페이지로 이동
-      // 이때 업로드한 문서 기반으로 생성할 수 있도록 정보를 넘겨주면 좋습니다.
-      navigate(`/projects/${id}/generate`, { state: { documentId } });
-      
+console.log("업로드 응답:", response.data);
+
+// 여기 수정
+const documentId =
+  response.data?.data?.document_id ||
+  response.data?.document_id ||
+  response.data?.id;
+
+console.log("추출된 documentId:", documentId);
+
+alert("기획서 업로드 성공! AI가 문서를 파싱하고 있습니다.");
+
+navigate(`/projects/${id}/generate`, {
+  state: { documentId }
+});
     } catch (error) {
       console.error("업로드 실패:", error);
       alert("파일 업로드 중 오류가 발생했습니다. 파일 형식을 확인해주세요.");
