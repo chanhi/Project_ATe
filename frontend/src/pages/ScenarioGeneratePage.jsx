@@ -11,6 +11,16 @@ const ScenarioGeneratePage = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [documentId, setDocumentId] = useState(null); // [추가] 문서 ID 상태 관리
 
+  const [selectedTechnique, setSelectedTechnique] = useState("");
+  const testTechniques = [
+    { value: "equivalence_partition", label: "동등 분할" },
+    { value: "boundary_value", label: "경계값 분석" },
+    { value: "decision_table", label: "결정 테이블" },
+    { value: "state_transition", label: "상태 전이" },
+    { value: "error_guessing", label: "에러 추측" },
+    { value: "scenario_based", label: "시나리오 기반" },
+  ];
+  
   useEffect(() => {
     // [추가] 이전 페이지(UploadSpecsPage)에서 넘겨준 documentId가 있는지 확인
     const receivedId = location.state?.documentId;
@@ -79,6 +89,28 @@ const ScenarioGeneratePage = () => {
           className="w-full h-64 p-8 bg-slate-50 rounded-[2rem] border-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 font-medium leading-relaxed resize-none transition-all outline-none"
         />
 
+        <div className="mb-8 text-left">
+          <label className="block text-sm font-bold text-slate-00 mb-3">
+            Test Technique
+          </label>
+          <select
+            value={selectedTechnique}
+            onChange={(e) => setSelectedTechnique(e.target.value)}
+            className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+          >
+            <option value="" disabled>테스트 기법을 선택하세요</option>
+
+            {testTechniques.map((technique) => (
+              <option
+                key={technique.value}
+                value={technique.value}
+              >
+                {technique.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        
         <div className="mt-12 flex justify-end">
           <button 
             onClick={handleGenerate}
