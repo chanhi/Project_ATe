@@ -2,33 +2,51 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 
+const STATUS_LABELS = {
+  SUCCESS: { label: '성공', color: 'text-emerald-400', emoji: '✓' },
+  PASSED: { label: '성공', color: 'text-emerald-400', emoji: '✓' },
+  FAILED: { label: '실패', color: 'text-red-400', emoji: '✗' },
+  FAILURE: { label: '실패', color: 'text-red-400', emoji: '✗' },
+  ERROR: { label: '오류', color: 'text-orange-400', emoji: '!' },
+  RUNNING: { label: '실행 중', color: 'text-amber-400', emoji: '⟳' },
+  QUEUED: { label: '대기 중', color: 'text-slate-400', emoji: '⋯' },
+};
+
+const TECHNIQUE_LABELS = {
+  scenario_based: '시나리오 기반',
+  boundary_value: '경계값 분석',
+  equivalence_partition: '동등 분할',
+  decision_table: '결정 테이블',
+  state_transition: '상태 전이',
+  error_guessing: '에러 추측',
+};
+
 const DashboardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [summary, setSummary] = useState(null);
   const [techData, setTechData] = useState([]);
-  const [recentRuns, setRecentRuns] = useState([]); // [수정] 실제 API 데이터 저장
+  const [recentRuns, setRecentRuns] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        // [연동] 최근 실행 내역 API를 포함하여 병렬 호출
         const [projectRes, summaryRes, techRes, recentRes] = await Promise.all([
           client.get(`/api/v1/projects/${id}`),
           client.get(`/api/v1/dashboard/summary?project_id=${id}`),
           client.get(`/api/v1/dashboard/by-technique?project_id=${id}`),
-          client.get(`/api/v1/dashboard/recent-runs?project_id=${id}&limit=5`) // [추가] 이미지 명세 확인 완료
+          client.get(`/api/v1/dashboard/recent-runs?project_id=${id}&limit=5`),
         ]);
 
         setProject(projectRes.data.data);
         setSummary(summaryRes.data.data);
         setTechData(techRes.data.data?.by_technique || []);
-        setRecentRuns(recentRes.data.data.runs || []); // [수정] data.runs 경로 매핑
+        setRecentRuns(recentRes.data.data?.runs || []);
       } catch (err) {
-        console.error("데이터 로드 중 오류 발생:", err);
+        console.error("데이터 로드 중 오류:", err);
       } finally {
         setLoading(false);
       }
@@ -37,7 +55,32 @@ const DashboardPage = () => {
     if (id) fetchDashboardData();
   }, [id]);
 
-  if (loading) return <div className="p-20 text-center font-black text-slate-300 animate-pulse">LOADING DASHBOARD...</div>;
+  // 시간 표시 헬퍼: "방금 전", "5분 전", "오늘 14:30", "어제 14:30", "5/22 14:30"
+  const formatRelativeTime = (isoString) => {
+    if (!isoString) return '시간 정보 없음';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return '방금 전';
+    if (diffMins < 60) return `${diffMins}분 전`;
+
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+
+    if (diffDays === 0) return `오늘 ${hh}:${mm}`;
+    if (diffDays === 1) return `어제 ${hh}:${mm}`;
+    if (diffDays < 7) return `${diffDays}일 전 ${hh}:${mm}`;
+
+    return `${date.getMonth() + 1}/${date.getDate()} ${hh}:${mm}`;
+  };
+
+  if (loading) {
+    return <div className="p-20 text-center font-black text-slate-300 animate-pulse">LOADING DASHBOARD...</div>;
+  }
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -46,7 +89,7 @@ const DashboardPage = () => {
           <h2 className="text-4xl font-black text-slate-900 tracking-tight">{project?.name}</h2>
           <p className="text-slate-400 mt-2 font-medium italic">{project?.base_url}</p>
         </div>
-        <button 
+        <button
           onClick={() => navigate(`/projects/${id}/run`)}
           className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg"
         >
@@ -57,11 +100,16 @@ const DashboardPage = () => {
       {/* 요약 통계 */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         <StatCard label="Total Cases" value={summary?.total_cases || 0} color="text-indigo-600" />
-        <StatCard label="Success Rate" value={summary?.pass_rate !== undefined ? `${summary.pass_rate}%` : "0%"} color="text-emerald-500" />
+        <StatCard
+          label="Success Rate"
+          value={summary?.pass_rate !== undefined ? `${summary.pass_rate}%` : "0%"}
+          color="text-emerald-500"
+        />
         <StatCard label="Total Runs" value={summary?.total_runs || 0} color="text-slate-700" />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        {/* 기법별 분포 */}
         <div className="lg:col-span-2">
           <section className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm h-full">
             <h3 className="text-xl font-black text-slate-900 mb-8">기법별 테스트 분포</h3>
@@ -69,39 +117,56 @@ const DashboardPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {techData.map((item, idx) => (
                   <div key={idx} className="bg-slate-50 p-8 rounded-3xl transition-all hover:bg-indigo-50">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{item.technique}</p>
-                    <p className="text-3xl font-black text-slate-800">{item.count} <span className="text-xs text-slate-400 font-medium">Cases</span></p></div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                      {TECHNIQUE_LABELS[item.technique] || item.technique}
+                    </p>
+                    <p className="text-3xl font-black text-slate-800">
+                      {item.count} <span className="text-xs text-slate-400 font-medium">Cases</span>
+                    </p>
+                  </div>
                 ))}
               </div>
             ) : (
-              <div className="h-40 flex items-center justify-center text-slate-300 font-bold">데이터가 없습니다.</div>
+              <div className="h-40 flex items-center justify-center text-slate-300 font-bold">
+                데이터가 없습니다.
+              </div>
             )}
           </section>
         </div>
 
-        {/* [수정] 최근 실행 내역 섹션 - 실제 API 응답 구조 반영 */}
+        {/* 최근 실행 기록 */}
         <div className="lg:col-span-1">
           <section className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl h-full">
-            <h3 className="text-xl font-black mb-8">최근 실행기록</h3>
-            <div className="space-y-6">
-              {recentRuns.length > 0 ? recentRuns.map((run, idx) => (
-                <div 
-                  key={idx} 
-                  onClick={() => navigate(`/projects/${id}/runs/${run.test_run_id}`)}
-                  className="group cursor-pointer border-b border-white/10 pb-4 hover:border-indigo-500 transition-colors"
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <span className={`text-[10px] font-black tracking-widest ${run.status === 'SUCCESS' ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {run.status}
-                    </span>
-                    <span className="text-slate-500 text-[10px] font-mono">
-                      {run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)}s` : '-'}
-                    </span>
+            <h3 className="text-xl font-black mb-8">최근 실행 기록</h3>
+            <div className="space-y-5">
+              {recentRuns.length > 0 ? recentRuns.map((run, idx) => {
+                const statusInfo = STATUS_LABELS[run.status] || STATUS_LABELS.QUEUED;
+                const displayTitle = run.title || '(이름 없는 테스트)';
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => navigate(`/projects/${id}/runs/${run.test_run_id}`)}
+                    className="group cursor-pointer border-b border-white/10 pb-4 hover:border-indigo-500 transition-colors last:border-b-0"
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className={`text-[11px] font-black tracking-widest flex items-center gap-1.5 ${statusInfo.color}`}>
+                        <span>{statusInfo.emoji}</span>
+                        {statusInfo.label}
+                      </span>
+                      <span className="text-slate-500 text-[10px] font-mono">
+                        {run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)}s` : '-'}
+                      </span>
+                    </div>
+                    <p className="font-bold text-sm group-hover:text-indigo-400 transition-colors line-clamp-2 mb-1">
+                      {displayTitle}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {formatRelativeTime(run.started_at || run.created_at)}
+                    </p>
                   </div>
-                  <p className="font-bold text-sm group-hover:text-indigo-400 transition-colors truncate">{run.test_run_id}</p>
-                  <p className="text-[10px] text-slate-500 mt-1">{new Date(run.started_at).toLocaleString()}</p>
-                </div>
-              )) : (
+                );
+              }) : (
                 <p className="text-slate-500 text-sm italic">최근 실행 기록이 없습니다.</p>
               )}
             </div>
