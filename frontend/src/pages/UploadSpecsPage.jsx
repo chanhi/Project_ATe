@@ -1,13 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Upload,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  ChevronRight,
+  X,
+  RotateCcw,
+  File as FileIcon,
+  Clock,
+  Cpu,
+  ArrowRight,
+  History,
+  Sparkles,
+} from 'lucide-react';
 import client from '../api/client';
+
+// 파일 형식별 색상
+const FILE_TYPE_BADGES = [
+  { ext: 'PDF',  color: 'bg-red-50 text-red-700 border-red-200' },
+  { ext: 'DOCX', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { ext: 'XLSX', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { ext: 'PPTX', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  { ext: 'TXT',  color: 'bg-slate-50 text-slate-700 border-slate-200' },
+  { ext: 'MD',   color: 'bg-slate-50 text-slate-700 border-slate-200' },
+  { ext: 'CSV',  color: 'bg-slate-50 text-slate-700 border-slate-200' },
+];
+
+const FLOW_STEPS = [
+  '문서 업로드',
+  '텍스트 추출',
+  '요구사항 분석',
+  '시나리오 생성 준비',
+];
 
 const UploadSpecsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [recentDocs, setRecentDocs] = useState([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+
+  // 최근 업로드 문서 로드
+  useEffect(() => {
+    const fetchRecent = async () => {
+      try {
+        const res = await client.get(`/api/v1/documents?project_id=${id}&limit=5`);
+        setRecentDocs(res.data?.data?.items || []);
+      } catch (err) {
+        console.error('최근 문서 로드 실패:', err);
+      } finally {
+        setLoadingRecent(false);
+      }
+    };
+    if (id) fetchRecent();
+  }, [id, uploadResult]); // 업로드 후 갱신
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -16,11 +71,17 @@ const UploadSpecsPage = () => {
     }
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      alert("업로드할 기획서 파일을 선택해주세요.");
-      return;
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setSelectedFile(e.dataTransfer.files[0]);
+      setUploadResult(null);
     }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
 
     const formData = new FormData();
     formData.append('project_id', id);
@@ -33,7 +94,6 @@ const UploadSpecsPage = () => {
       const response = await client.post('/api/v1/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
       const data = response.data?.data || response.data;
       setUploadResult({
         success: true,
@@ -69,192 +129,378 @@ const UploadSpecsPage = () => {
     setUploadResult(null);
   };
 
+  const formatRelative = (iso) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    const mins = Math.floor((new Date() - date) / 60000);
+    if (mins < 1) return '방금 전';
+    if (mins < 60) return `${mins}분 전`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}시간 전`;
+    return `${Math.floor(hours / 24)}일 전`;
+  };
+
+  const formatSize = (bytes) => {
+    if (!bytes) return '-';
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  };
+
   return (
-    <div className="max-w-4xl mx-auto py-16 animate-in fade-in duration-700">
-      <header className="mb-12 text-center">
-        <h2 className="text-4xl font-black text-slate-900 tracking-tight">파일 첨부</h2>
-        <p className="text-slate-400 mt-4 font-medium italic">
-          PDF, DOCX, XLSX 등 기획서를 업로드하여 AI 시나리오를 설계하세요.
+    <div className="animate-in fade-in duration-500">
+      {/* 좌측 정렬 헤더 */}
+      <header className="mb-5">
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">기획서 첨부</h2>
+        <p className="text-slate-500 text-sm mt-0.5">
+          기획서를 업로드하면 AI가 텍스트를 추출하여 시나리오 생성에 사용합니다.
         </p>
       </header>
 
-      {/* 파일 선택 영역 */}
-      {!uploadResult && (
-        <div className="bg-white rounded-[3rem] p-12 border-2 border-dashed border-slate-200 hover:border-indigo-300 transition-all text-center group">
-          <input
-            type="file"
-            onChange={handleFileChange}
-            className="hidden"
-            id="spec-file-input"
-            accept=".pdf,.docx,.xlsx,.txt,.md,.hwp,.pptx,.csv"
-          />
-          <label htmlFor="spec-file-input" className="cursor-pointer">
-            <div className="w-24 h-24 bg-slate-50 rounded-[2rem] mx-auto mb-6 flex items-center justify-center group-hover:bg-indigo-50 transition-colors text-4xl">
-              📄
-            </div>
-            <p className="text-xl font-black text-slate-800">기획서 파일을 선택하세요</p>
-            <p className="text-sm text-slate-400 mt-2 font-medium">
-              지원: pdf, docx, xlsx, txt, md, pptx, csv
-            </p>
-          </label>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-          {selectedFile && (
-            <div className="mt-10 p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100 animate-in zoom-in-95">
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-indigo-500 font-bold">READY:</span>
-                <span className="font-bold text-slate-700">{selectedFile.name}</span>
-                <span className="text-xs text-slate-400">
-                  ({(selectedFile.size / 1024).toFixed(1)} KB)
-                </span>
-                <button
-                  onClick={() => setSelectedFile(null)}
-                  className="text-xs text-slate-400 hover:text-red-500 font-bold ml-2"
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          )}
+        {/* 좌측: 업로드 영역 (2/3) */}
+        <div className="lg:col-span-2 space-y-3">
 
-          <button
-            onClick={handleUpload}
-            disabled={isUploading || !selectedFile}
-            className={`mt-12 w-full py-5 rounded-2xl font-black text-white shadow-2xl transition-all flex items-center justify-center gap-3 ${
-              isUploading || !selectedFile
-                ? 'bg-slate-200 cursor-not-allowed'
-                : 'bg-slate-900 hover:bg-indigo-600 active:scale-95 shadow-slate-200'
-            }`}
-          >
-            {isUploading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                AI 분석 엔진 가동 중...
-              </>
-            ) : (
-              "기획서 분석 및 업로드 시작"
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* 업로드 결과 영역 */}
-      {uploadResult && (
-        <div className="animate-in fade-in zoom-in-95 duration-500">
-          {uploadResult.success ? (
-            <div className="space-y-6">
-              {/* 성공 헤더 */}
-              <div className={`rounded-[2.5rem] p-10 border ${
-                uploadResult.extractStatus === 'extracted'
-                  ? 'bg-emerald-50 border-emerald-200'
-                  : 'bg-amber-50 border-amber-200'
-              }`}>
-                <div className="flex items-start gap-4">
-                  <div className="text-5xl">
-                    {uploadResult.extractStatus === 'extracted' ? '✅' : '⚠️'}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className={`text-2xl font-black mb-2 ${
-                      uploadResult.extractStatus === 'extracted'
-                        ? 'text-emerald-800'
-                        : 'text-amber-800'
-                    }`}>
-                      {uploadResult.extractStatus === 'extracted'
-                        ? '업로드 및 텍스트 추출 완료'
-                        : '업로드 완료 (텍스트 추출 실패)'}
-                    </h3>
-                    <p className={`text-sm ${
-                      uploadResult.extractStatus === 'extracted'
-                        ? 'text-emerald-700'
-                        : 'text-amber-700'
-                    }`}>
-                      {uploadResult.message}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 mt-8">
-                  <InfoBlock label="파일명" value={uploadResult.filename} />
-                  <InfoBlock label="문서 ID" value={uploadResult.documentId} mono />
-                  <InfoBlock
-                    label="추출 글자수"
-                    value={uploadResult.extractedLength > 0
-                      ? `${uploadResult.extractedLength.toLocaleString()}자`
-                      : '없음'}
-                  />
-                </div>
-              </div>
-
-              {/* 텍스트 미리보기 */}
-              {uploadResult.preview && (
-                <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
-                    추출된 텍스트 미리보기
-                  </h4>
-                  <pre className="text-sm text-slate-600 leading-relaxed font-mono bg-slate-50 p-6 rounded-2xl whitespace-pre-wrap max-h-64 overflow-y-auto">
-                    {uploadResult.preview}
-                  </pre>
-                  <p className="text-xs text-slate-400 mt-3">
-                    💡 이 텍스트가 AI 시나리오 생성에 사용됩니다.
-                  </p>
-                </div>
-              )}
-
-              {/* 추출 실패 안내 */}
-              {!uploadResult.preview && uploadResult.error && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-                  <p className="text-red-700 font-bold mb-2">⚠️ 텍스트 추출 실패</p>
-                  <p className="text-red-600 text-sm">{uploadResult.error}</p>
-                  <p className="text-red-500 text-xs mt-2">
-                    그래도 시나리오 생성 페이지에서 자연어 입력으로 진행할 수 있습니다.
-                  </p>
-                </div>
-              )}
-
-              {/* 액션 버튼 */}
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={handleReset}
-                  className="py-5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black hover:bg-slate-50 transition-all"
-                >
-                  다른 파일 업로드
-                </button>
-                <button
-                  onClick={handleProceedToGenerate}
-                  className="py-5 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
-                >
-                  AI 시나리오 생성하기 →
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-red-50 border border-red-200 rounded-[2.5rem] p-10">
-              <div className="flex items-start gap-4">
-                <div className="text-5xl">❌</div>
-                <div className="flex-1">
-                  <h3 className="text-2xl font-black text-red-800 mb-2">업로드 실패</h3>
-                  <p className="text-red-700 text-sm">{uploadResult.error}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleReset}
-                className="mt-6 w-full py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700"
+          {!uploadResult && (
+            <>
+              {/* 드롭존 */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                className={`bg-white rounded-xl border-2 border-dashed transition-all ${
+                  isDragging
+                    ? 'border-indigo-500 bg-indigo-50/50'
+                    : 'border-slate-300 hover:border-slate-400'
+                }`}
               >
-                다시 시도
-              </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="spec-file-input"
+                  accept=".pdf,.docx,.xlsx,.txt,.md,.hwp,.pptx,.csv"
+                />
+                <label htmlFor="spec-file-input" className="cursor-pointer block px-6 py-10 text-center">
+                  <div className={`w-12 h-12 mx-auto mb-3 rounded-lg flex items-center justify-center transition-colors ${
+                    isDragging ? 'bg-indigo-100' : 'bg-slate-100'
+                  }`}>
+                    <Upload className={`w-5 h-5 ${isDragging ? 'text-indigo-600' : 'text-slate-500'}`} strokeWidth={2.2} />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 mb-1">
+                    {isDragging ? '여기에 놓으세요' : '파일을 드래그하거나 클릭하여 선택'}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    AI Requirement Parser v2 · 최대 10MB
+                  </p>
+
+                  {/* 지원 파일 badge */}
+                  <div className="flex flex-wrap justify-center gap-1.5 mt-4">
+                    {FILE_TYPE_BADGES.map(({ ext, color }) => (
+                      <span
+                        key={ext}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border ${color}`}
+                      >
+                        {ext}
+                      </span>
+                    ))}
+                  </div>
+                </label>
+
+                {/* 선택된 파일 */}
+                {selectedFile && (
+                  <div className="px-6 pb-5 animate-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <div className="w-9 h-9 bg-white rounded-md border border-slate-200 flex items-center justify-center flex-shrink-0">
+                        <FileIcon className="w-4 h-4 text-slate-500" strokeWidth={2.2} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-800 truncate">{selectedFile.name}</p>
+                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                          {formatSize(selectedFile.size)} · {selectedFile.type || 'unknown'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedFile(null)}
+                        className="text-slate-400 hover:text-red-500 flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleUpload}
+                      disabled={isUploading}
+                      className={`mt-3 w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                        isUploading
+                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          : 'bg-slate-900 text-white hover:bg-indigo-600 active:scale-[0.98]'
+                      }`}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          업로드 및 분석 중
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" strokeWidth={2.2} />
+                          업로드 시작
+                          <span className="text-[10px] opacity-70 ml-1">· ~10s</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 처리 흐름 (업로드 중일 때) */}
+              {isUploading && (
+                <div className="bg-slate-900 rounded-xl p-4 text-white animate-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-bold">분석 진행</h3>
+                    <span className="text-[10px] text-slate-500 font-mono">processing...</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {FLOW_STEPS.map((step, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-[11px]">
+                        {idx === 0 ? (
+                          <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin flex-shrink-0" />
+                        ) : (
+                          <div className="w-3.5 h-3.5 rounded-full border border-slate-700 flex-shrink-0" />
+                        )}
+                        <span className={idx === 0 ? 'text-white font-bold' : 'text-slate-500'}>
+                          {step}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* 업로드 결과 */}
+          {uploadResult && (
+            <div className="animate-in fade-in zoom-in-95 duration-300 space-y-3">
+              {uploadResult.success ? (
+                <>
+                  <div className={`rounded-xl p-4 border ${
+                    uploadResult.extractStatus === 'extracted'
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-amber-50 border-amber-200'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      {uploadResult.extractStatus === 'extracted'
+                        ? <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0" strokeWidth={2.2} />
+                        : <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0" strokeWidth={2.2} />
+                      }
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`text-sm font-black mb-0.5 ${
+                          uploadResult.extractStatus === 'extracted'
+                            ? 'text-emerald-800'
+                            : 'text-amber-800'
+                        }`}>
+                          {uploadResult.extractStatus === 'extracted'
+                            ? '업로드 및 텍스트 추출 완료'
+                            : '업로드 완료 (텍스트 추출 실패)'}
+                        </h3>
+                        <p className={`text-xs ${
+                          uploadResult.extractStatus === 'extracted'
+                            ? 'text-emerald-700'
+                            : 'text-amber-700'
+                        }`}>
+                          {uploadResult.message}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-white/40">
+                      <InfoBlock label="파일명" value={uploadResult.filename} />
+                      <InfoBlock label="문서 ID" value={uploadResult.documentId} mono />
+                      <InfoBlock
+                        label="추출 글자수"
+                        value={uploadResult.extractedLength > 0
+                          ? `${uploadResult.extractedLength.toLocaleString()}자`
+                          : '없음'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 미리보기 */}
+                  {uploadResult.preview && (
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <FileText className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+                        <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                          추출 텍스트 미리보기
+                        </h4>
+                      </div>
+                      <pre className="text-xs text-slate-700 leading-relaxed font-mono bg-slate-50 p-3 rounded-md whitespace-pre-wrap max-h-48 overflow-y-auto custom-scroll border border-slate-100">
+                        {uploadResult.preview}
+                      </pre>
+                    </div>
+                  )}
+
+                  {!uploadResult.preview && uploadResult.error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" strokeWidth={2.2} />
+                      <div className="flex-1">
+                        <p className="text-red-700 font-bold mb-0.5 text-xs">텍스트 추출 실패</p>
+                        <p className="text-red-600 text-[11px]">{uploadResult.error}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleReset}
+                      className="py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.2} />
+                      다른 파일 업로드
+                    </button>
+                    <button
+                      onClick={handleProceedToGenerate}
+                      className="py-2.5 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+                    >
+                      시나리오 생성
+                      <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.2} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-6 h-6 text-red-500 flex-shrink-0" strokeWidth={2.2} />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-black text-red-800 mb-0.5">업로드 실패</h3>
+                      <p className="text-red-700 text-xs">{uploadResult.error}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleReset}
+                    className="mt-3 w-full py-2.5 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 flex items-center justify-center gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    다시 시도
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+
+        {/* 우측: 정보 패널 (1/3) */}
+        <div className="lg:col-span-1 space-y-3">
+
+          {/* 처리 흐름 */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Cpu className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Processing Flow
+              </h3>
+            </div>
+            <ol className="space-y-2">
+              {FLOW_STEPS.map((step, idx) => (
+                <li key={idx} className="flex items-center gap-2 text-xs">
+                  <span className="w-4 h-4 flex-shrink-0 bg-slate-100 text-slate-500 rounded text-[9px] flex items-center justify-center font-mono font-bold">
+                    {idx + 1}
+                  </span>
+                  <span className="text-slate-600">{step}</span>
+                  {idx < FLOW_STEPS.length - 1 && (
+                    <ArrowRight className="w-3 h-3 text-slate-300 ml-auto" strokeWidth={2.2} />
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {/* 최근 업로드 */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  최근 업로드
+                </h3>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {recentDocs.length}
+              </span>
+            </div>
+
+            {loadingRecent ? (
+              <div className="py-4 flex justify-center">
+                <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
+              </div>
+            ) : recentDocs.length === 0 ? (
+              <p className="text-[11px] text-slate-400 italic text-center py-3">
+                업로드된 문서가 없습니다.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {recentDocs.map((doc) => (
+                  <li
+                    key={doc.document_id}
+                    onClick={() => navigate(`/projects/${id}/generate`, { state: { documentId: doc.document_id } })}
+                    className="group flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <FileIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" strokeWidth={2.2} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
+                        {doc.filename}
+                      </p>
+                      <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                        <span>{formatSize(doc.file_size_bytes)}</span>
+                        <span>·</span>
+                        <Clock className="w-2.5 h-2.5" strokeWidth={2.2} />
+                        <span>{formatRelative(doc.created_at)}</span>
+                      </p>
+                    </div>
+                    <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-indigo-500 flex-shrink-0" strokeWidth={2.2} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* 도움말 */}
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Sparkles className="w-3 h-3 text-indigo-500" strokeWidth={2.2} />
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Tip
+              </h3>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              구조화된 PRD, 사용자 스토리, QA 문서를 업로드하면 더 정확한 시나리오가 생성됩니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.3);
+          border-radius: 999px;
+        }
+      `}</style>
     </div>
   );
 };
 
 const InfoBlock = ({ label, value, mono = false }) => (
   <div>
-    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">
       {label}
     </p>
-    <p className={`text-sm font-bold text-slate-700 truncate ${mono ? 'font-mono' : ''}`}>
+    <p className={`text-xs font-bold text-slate-800 truncate ${mono ? 'font-mono' : ''}`}>
       {value}
     </p>
   </div>
