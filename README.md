@@ -589,11 +589,6 @@ Playwright 베이스 이미지(약 1.5GB) 다운로드 때문에 첫 빌드만 5
 
 ---
 
-## 라이선스
-
-Internal project — 경기대학교 산학협력 프로젝트 (NHN CLOUD)
-
----
 
 ## 기여자
 
