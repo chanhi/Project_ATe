@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, Outlet, useLocation } from 'react-router-
 import {
   Upload,
   Sparkles,
-  ListChecks,
+ ListChecks,
   PlayCircle,
   LayoutDashboard,
   ArrowLeft,
@@ -14,7 +14,8 @@ const ProjectDetailPage = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const isProjectRoot = pathname === `/projects/${id}` || pathname === `/projects/${id}/`;
+  const isProjectRoot =
+    pathname === `/projects/${id}` || pathname === `/projects/${id}/`;
 
   useEffect(() => {
     if (isProjectRoot) {
@@ -23,25 +24,35 @@ const ProjectDetailPage = () => {
   }, [id, isProjectRoot, navigate]);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="w-60 bg-white border-r border-slate-200 flex flex-col px-4 py-6 sticky top-0 h-screen">
-        <Link
-          to="/"
-          className="text-2xl font-black tracking-tighter italic mb-8 px-2 hover:text-indigo-600 transition-colors"
-        >
-          ATe
-        </Link>
+    <div className="flex min-h-screen bg-[#FAFAFA]">
+      {/* Sidebar */}
+      <aside className="w-64 bg-[#F7F8FA] border-r border-slate-200/70 flex flex-col px-3 py-5 sticky top-0 h-screen">
+        
+       {/* Logo */}
+<Link
+  to="/"
+  className="flex items-center px-4 mb-6 mt-2"
+>
+  <img
+    src="/images/ate-logo.png"
+    alt="ATe Logo"
+   className="w-40 h-auto object-contain"
+  />
+</Link>
 
+        {/* Navigation */}
         <nav className="flex-1 space-y-0.5">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-3">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2.5">
             자동화 테스트
           </p>
+
           <MenuLink
             to={`/projects/${id}/upload`}
             label="기획서 첨부"
             Icon={Upload}
             active={pathname.includes('/upload')}
           />
+
           <MenuLink
             to={`/projects/${id}/generate`}
             label="시나리오 생성"
@@ -49,23 +60,26 @@ const ProjectDetailPage = () => {
             active={pathname.includes('/generate')}
           />
 
-          <div className="my-5 border-t border-slate-100"></div>
+          <div className="my-4 border-t border-slate-200/70"></div>
 
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-3">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2.5">
             실행 및 분석
           </p>
+
           <MenuLink
             to={`/projects/${id}/cases`}
             label="테스트 케이스"
             Icon={ListChecks}
             active={pathname.includes('/cases')}
           />
+
           <MenuLink
             to={`/projects/${id}/run`}
             label="테스트 실행"
             Icon={PlayCircle}
             active={pathname.includes('/run')}
           />
+
           <MenuLink
             to={`/projects/${id}/dashboard`}
             label="대시보드"
@@ -74,16 +88,18 @@ const ProjectDetailPage = () => {
           />
         </nav>
 
+        {/* Footer Button */}
         <button
           onClick={() => navigate('/projects')}
-          className="mt-auto py-2.5 px-3 text-slate-500 font-medium hover:text-slate-900 text-xs flex items-center gap-2 transition-colors"
+          className="mt-auto py-2 px-2.5 text-slate-500 font-medium hover:text-slate-900 text-[11px] flex items-center gap-2 transition-colors"
         >
-          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.2} />
+          <ArrowLeft className="w-3 h-3" strokeWidth={2.2} />
           프로젝트 목록으로
         </button>
       </aside>
 
-      <main className="flex-1 px-10 py-8 overflow-y-auto">
+      {/* Main Content */}
+      <main className="flex-1 px-8 py-6 overflow-y-auto bg-[#FAFAFA]">
         <Outlet />
       </main>
     </div>
@@ -93,14 +109,18 @@ const ProjectDetailPage = () => {
 const MenuLink = ({ to, label, Icon, active }) => (
   <Link
     to={to}
-    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-all ${
+    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-[14px] transition-all ${
       active
-        ? 'bg-slate-900 text-white'
-        : 'text-slate-600 hover:bg-slate-100'
+        ? 'bg-white text-slate-900 border border-slate-200 shadow-sm'
+        : 'text-slate-600 hover:bg-white hover:text-slate-900'
     }`}
   >
-    <Icon className="w-4 h-4" strokeWidth={active ? 2.5 : 2.2} />
-    {label}
+    <Icon
+      className="w-4 h-4 shrink-0"
+      strokeWidth={active ? 2.4 : 2.1}
+    />
+
+    <span>{label}</span>
   </Link>
 );
 

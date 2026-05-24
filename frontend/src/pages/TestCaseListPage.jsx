@@ -27,12 +27,11 @@ const TECHNIQUE_LABELS = {
   error_guessing:        '에러추측',
 };
 
-// 우선순위 계층 - HIGH/CRITICAL은 강조, 나머지는 톤다운
 const PRIORITY_STYLES = {
-  critical: 'bg-red-100 text-red-700 ring-1 ring-red-300 font-bold',
-  high:     'bg-orange-100 text-orange-700 ring-1 ring-orange-300 font-bold',
-  medium:   'bg-slate-100 text-slate-600 font-medium',
-  low:      'bg-slate-50 text-slate-500 font-medium',
+  critical: 'bg-red-50 text-red-700 border border-red-200 font-bold',
+  high:     'bg-orange-50 text-orange-700 border border-orange-200 font-bold',
+  medium:   'bg-slate-50 text-slate-600 border border-slate-200 font-medium',
+  low:      'bg-slate-50 text-slate-500 border border-slate-200 font-medium',
 };
 
 const LAST_RUN_STYLES = {
@@ -128,12 +127,11 @@ const TestCaseListPage = () => {
   const pendingCount = testCases.filter(tc => !tc.playwright_code || tc.title?.includes('대기중')).length;
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {/* 헤더 */}
-      <header className="mb-6 flex justify-between items-center">
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <header className="mb-5 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">테스트 케이스</h2>
-          <p className="text-slate-500 mt-1 text-sm font-medium">
+          <p className="text-slate-500 mt-0.5 text-sm font-medium">
             총 {testCases.length}개
             {pendingCount > 0 && (
               <span className="ml-2 text-amber-600 font-semibold inline-flex items-center gap-1">
@@ -146,16 +144,16 @@ const TestCaseListPage = () => {
         <div className="flex gap-2">
           <button
             onClick={() => navigate(`/projects/${id}/generate`)}
-            className="bg-white border border-slate-200 text-slate-700 px-3.5 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all flex items-center gap-1.5"
+            className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-slate-50 transition-all flex items-center gap-1.5"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3 h-3" />
             새로 생성
           </button>
           <button
             onClick={() => navigate(`/projects/${id}/run`)}
-            className="bg-slate-900 text-white px-3.5 py-2 rounded-lg text-sm font-bold hover:bg-indigo-600 transition-all flex items-center gap-1.5"
+            className="bg-slate-900 text-white px-3 py-1.5 rounded-md text-xs font-bold hover:bg-cyan-700 transition-all flex items-center gap-1.5"
           >
-            <Play className="w-3.5 h-3.5" fill="currentColor" />
+            <Play className="w-3 h-3" fill="currentColor" />
             실행 페이지
           </button>
         </div>
@@ -167,7 +165,7 @@ const TestCaseListPage = () => {
           <p className="text-slate-500 font-semibold mb-4">생성된 테스트 케이스가 없습니다.</p>
           <button
             onClick={() => navigate(`/projects/${id}/generate`)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-indigo-700 inline-flex items-center gap-1.5"
+            className="bg-cyan-700 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-cyan-800 inline-flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5" />
             테스트 케이스 생성
@@ -186,17 +184,16 @@ const TestCaseListPage = () => {
               <div
                 key={tc.test_case_id}
                 onClick={() => navigate(`/projects/${id}/cases/${tc.test_case_id}`)}
-                className={`bg-white rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-sm cursor-pointer transition-all group ${
+                className={`bg-white rounded-xl border border-slate-200 hover:border-cyan-700/40 hover:shadow-sm cursor-pointer transition-all group ${
                   isPending ? 'opacity-60' : ''
                 }`}
               >
-                {/* 상단: ID + 제목 + 태그 */}
                 <div className="px-5 pt-4 pb-3">
                   <div className="flex items-start gap-3 mb-1.5">
-                    <span className="text-xs font-mono font-bold text-indigo-600 mt-0.5 flex-shrink-0">
+                    <span className="text-xs font-mono font-bold text-slate-400 mt-0.5 flex-shrink-0">
                       {displayId}
                     </span>
-                    <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors flex-1 leading-tight">
+                    <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-cyan-700 transition-colors flex-1 leading-tight">
                       {tc.title || '(제목 없음)'}
                     </h3>
                     {isPending && (
@@ -207,7 +204,6 @@ const TestCaseListPage = () => {
                     )}
                   </div>
 
-                  {/* 태그 (계층화) */}
                   <div className="flex flex-wrap gap-1.5 ml-[64px]">
                     {tc.priority && (
                       <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${PRIORITY_STYLES[tc.priority] || PRIORITY_STYLES.medium}`}>
@@ -215,19 +211,18 @@ const TestCaseListPage = () => {
                       </span>
                     )}
                     {tc.technique && (
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-50 text-indigo-600 font-medium">
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-50 text-slate-600 font-medium border border-slate-200">
                         {TECHNIQUE_LABELS[tc.technique] || tc.technique}
                       </span>
                     )}
                     {tc.category && (
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-50 text-slate-500 font-medium uppercase">
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-50 text-slate-500 font-medium uppercase border border-slate-200">
                         {tc.category}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* 설명 */}
                 {tc.description && (
                   <div className="px-5 pb-3 ml-[64px]">
                     <p className="text-slate-700 text-[13px] leading-relaxed line-clamp-2">
@@ -236,9 +231,7 @@ const TestCaseListPage = () => {
                   </div>
                 )}
 
-                {/* 메타데이터 그리드 */}
                 <div className="px-5 py-3 ml-[64px] mr-5 border-t border-slate-100 grid grid-cols-4 gap-3 text-[11px]">
-                  {/* 절차 (펼치기) */}
                   <button
                     onClick={(e) => toggleSteps(e, tc.test_case_id)}
                     className="text-left hover:opacity-70 transition-opacity"
@@ -252,7 +245,6 @@ const TestCaseListPage = () => {
                     </div>
                   </button>
 
-                  {/* 실행 횟수 */}
                   <div>
                     <div className="flex items-center gap-1 text-slate-400 font-semibold uppercase tracking-wide mb-0.5">
                       <Hash className="w-3 h-3" />
@@ -263,7 +255,6 @@ const TestCaseListPage = () => {
                     </div>
                   </div>
 
-                  {/* 최근 실행 결과 */}
                   <div>
                     <div className="flex items-center gap-1 text-slate-400 font-semibold uppercase tracking-wide mb-0.5">
                       최근 결과
@@ -283,7 +274,6 @@ const TestCaseListPage = () => {
                     )}
                   </div>
 
-                  {/* 생성일 / 최근 실행 시각 */}
                   <div>
                     <div className="flex items-center gap-1 text-slate-400 font-semibold uppercase tracking-wide mb-0.5">
                       <Calendar className="w-3 h-3" />
@@ -295,7 +285,6 @@ const TestCaseListPage = () => {
                   </div>
                 </div>
 
-                {/* 절차 펼침 영역 */}
                 {stepsExpanded && tc.steps && tc.steps.length > 0 && (
                   <div
                     onClick={(e) => e.stopPropagation()}
@@ -310,7 +299,7 @@ const TestCaseListPage = () => {
                           <span>
                             <span className="font-semibold">{step.action || '동작'}</span>
                             {step.target && <span className="text-slate-500 ml-1">→ {step.target}</span>}
-                            {step.input && <span className="text-indigo-600 ml-1">({step.input})</span>}
+                            {step.input && <span className="text-cyan-700 ml-1">({step.input})</span>}
                           </span>
                         </li>
                       ))}
@@ -324,7 +313,6 @@ const TestCaseListPage = () => {
                   </div>
                 )}
 
-                {/* 하단 액션 */}
                 <div className="px-5 pb-3 ml-[64px] flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(tc); }}
@@ -333,7 +321,7 @@ const TestCaseListPage = () => {
                     <Trash2 className="w-3 h-3" />
                     삭제
                   </button>
-                  <span className="text-indigo-600 text-[11px] font-bold flex items-center gap-0.5">
+                  <span className="text-cyan-700 text-[11px] font-bold flex items-center gap-0.5">
                     상세
                     <ChevronRight className="w-3 h-3" />
                   </span>
@@ -344,38 +332,37 @@ const TestCaseListPage = () => {
         </div>
       )}
 
-      {/* 삭제 모달 */}
       {deleteTarget && (
         <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 z-50 animate-in fade-in"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6 z-50 animate-in fade-in"
           onClick={() => !deleting && setDeleteTarget(null)}
         >
           <div
-            className="bg-white rounded-xl p-7 max-w-md w-full shadow-2xl animate-in zoom-in-95"
+            className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 border border-slate-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
                 <AlertCircle className="w-6 h-6 text-red-500" />
               </div>
               <h2 className="text-lg font-bold text-slate-900 mb-1">테스트 케이스 삭제</h2>
               <p className="text-slate-600 text-sm mb-1">
                 <span className="font-semibold">"{deleteTarget.title}"</span>를 삭제합니다.
               </p>
-              <p className="text-red-500 text-xs mb-6">이 작업은 되돌릴 수 없습니다.</p>
+              <p className="text-red-500 text-xs mb-5">이 작업은 되돌릴 수 없습니다.</p>
 
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setDeleteTarget(null)}
                   disabled={deleting}
-                  className="py-2.5 bg-slate-100 text-slate-700 rounded-lg font-semibold hover:bg-slate-200 disabled:opacity-50 text-sm"
+                  className="py-2.5 bg-slate-100 text-slate-700 rounded-lg font-bold text-sm hover:bg-slate-200 disabled:opacity-50"
                 >
                   취소
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                  className="py-2.5 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : '삭제'}
                 </button>

@@ -22,12 +22,12 @@ import {
 import client from '../api/client';
 
 const STATUS_CONFIG = {
-  SUCCESS: { label: '성공', color: 'text-emerald-500', Icon: CheckCircle2 },
-  PASSED:  { label: '성공', color: 'text-emerald-500', Icon: CheckCircle2 },
-  FAILED:  { label: '실패', color: 'text-red-500',     Icon: XCircle },
-  FAILURE: { label: '실패', color: 'text-red-500',     Icon: XCircle },
-  ERROR:   { label: '오류', color: 'text-orange-500',  Icon: AlertCircle },
-  RUNNING: { label: '실행', color: 'text-amber-500',   Icon: Loader2 },
+  SUCCESS: { label: '성공', color: 'text-emerald-600', Icon: CheckCircle2 },
+  PASSED:  { label: '성공', color: 'text-emerald-600', Icon: CheckCircle2 },
+  FAILED:  { label: '실패', color: 'text-red-600',     Icon: XCircle },
+  FAILURE: { label: '실패', color: 'text-red-600',     Icon: XCircle },
+  ERROR:   { label: '오류', color: 'text-orange-600',  Icon: AlertCircle },
+  RUNNING: { label: '실행', color: 'text-amber-600',   Icon: Loader2 },
   QUEUED:  { label: '대기', color: 'text-slate-500',   Icon: Clock },
 };
 
@@ -40,7 +40,8 @@ const TECHNIQUE_LABELS = {
   error_guessing:        '에러 추측',
 };
 
-const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+// 톤 다운된 차트 컬러 (전부 cyan/slate 계열)
+const CHART_COLORS = ['#0e7490', '#0891b2', '#22d3ee', '#67e8f9', '#475569', '#94a3b8'];
 
 const DashboardPage = () => {
   const { id } = useParams();
@@ -120,8 +121,7 @@ const DashboardPage = () => {
   const errorPercent = totalRuns > 0 ? Math.round((errorCount / totalRuns) * 100) : 0;
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {/* 커스텀 스크롤바 스타일 */}
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
       <style>{`
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -129,12 +129,8 @@ const DashboardPage = () => {
           background: rgba(148, 163, 184, 0.3);
           border-radius: 999px;
         }
-        .custom-scroll::-webkit-scrollbar-thumb:hover {
-          background: rgba(148, 163, 184, 0.5);
-        }
       `}</style>
 
-      {/* 헤더 */}
       <header className="mb-5 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">{project?.name}</h2>
@@ -142,25 +138,24 @@ const DashboardPage = () => {
         </div>
         <button
           onClick={() => navigate(`/projects/${id}/run`)}
-          className="px-3.5 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-indigo-600 transition-all shadow-sm flex items-center gap-1.5"
+          className="px-3.5 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-all flex items-center gap-1.5"
         >
           <Play className="w-3.5 h-3.5" fill="currentColor" />
           새 테스트 실행
         </button>
       </header>
 
-      {/* KPI 카드 (컴팩트) */}
+      {/* KPI */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <KpiCard label="TOTAL CASES" value={summary?.total_cases || 0} Icon={FileText} accent="text-indigo-600" />
+        <KpiCard label="TOTAL CASES" value={summary?.total_cases || 0} Icon={FileText} accent="text-cyan-700" />
         <KpiCard label="SUCCESS RATE" value={summary?.pass_rate !== undefined ? `${summary.pass_rate}%` : "0%"} Icon={TrendingUp} accent="text-emerald-600" />
         <KpiCard label="TOTAL RUNS" value={summary?.total_runs || 0} Icon={Activity} accent="text-slate-900" />
         <KpiCard label="FAILURES" value={failed + errorCount} Icon={XCircle} accent={(failed + errorCount) > 0 ? "text-red-500" : "text-slate-900"} />
       </section>
 
-      {/* 메인 그리드 */}
       <div className="grid grid-cols-12 gap-3">
 
-        {/* 기법별 분포 - 도넛 크게 + 중앙 숫자 */}
+        {/* 기법별 분포 */}
         <section className="col-span-12 lg:col-span-5 bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-slate-900">기법별 테스트 분포</h3>
@@ -169,7 +164,6 @@ const DashboardPage = () => {
 
           {techChartData.length > 0 ? (
             <div className="grid grid-cols-5 gap-3 items-center">
-              {/* 도넛 + 중앙 숫자 */}
               <div className="col-span-3 relative">
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
@@ -188,7 +182,7 @@ const DashboardPage = () => {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        background: '#1e293b',
+                        background: '#0f172a',
                         border: 'none',
                         borderRadius: '6px',
                         fontSize: '11px',
@@ -204,7 +198,6 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* 범례 (compact) */}
               <div className="col-span-2 space-y-1.5">
                 {techChartData.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between text-xs">
@@ -222,7 +215,7 @@ const DashboardPage = () => {
           )}
         </section>
 
-        {/* 실행 결과 분포 - 스택바 + 숫자 */}
+        {/* 실행 결과 분포 */}
         <section className="col-span-12 lg:col-span-3 bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-slate-900">실행 결과 분포</h3>
@@ -231,7 +224,6 @@ const DashboardPage = () => {
 
           {totalRuns > 0 ? (
             <>
-              {/* 스택 바 */}
               <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-100 mb-4">
                 {passed > 0 && (
                   <div className="bg-emerald-500" style={{ width: `${passPercent}%` }} title={`성공 ${passed}`} />
@@ -244,7 +236,6 @@ const DashboardPage = () => {
                 )}
               </div>
 
-              {/* 숫자 분포 */}
               <div className="space-y-2">
                 <ResultRow color="bg-emerald-500" label="성공" value={passed} percent={passPercent} />
                 <ResultRow color="bg-red-500" label="실패" value={failed} percent={failPercent} />
@@ -262,10 +253,10 @@ const DashboardPage = () => {
         </section>
 
         {/* 최근 실행 기록 */}
-        <section className="col-span-12 lg:col-span-4 bg-slate-900 rounded-xl p-4 text-white">
+        <section className="col-span-12 lg:col-span-4 bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold">최근 실행 기록</h3>
-            <Activity className="w-3.5 h-3.5 text-slate-500" />
+            <h3 className="text-sm font-bold text-slate-900">최근 실행 기록</h3>
+            <Activity className="w-3.5 h-3.5 text-slate-400" />
           </div>
 
           <div className="custom-scroll space-y-0 max-h-[300px] overflow-y-auto -mx-1.5 px-1.5">
@@ -278,7 +269,7 @@ const DashboardPage = () => {
                 <div
                   key={idx}
                   onClick={() => navigate(`/projects/${id}/runs/${run.test_run_id}`)}
-                  className="group cursor-pointer rounded-lg px-2 py-1.5 hover:bg-white/5 transition-colors"
+                  className="group cursor-pointer rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"
                 >
                   <div className="flex items-start gap-2">
                     <StatusIcon
@@ -286,10 +277,10 @@ const DashboardPage = () => {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className="text-[13px] font-bold truncate group-hover:text-indigo-300 transition-colors">
+                        <p className="text-[13px] font-bold text-slate-800 truncate group-hover:text-cyan-700 transition-colors">
                           {run.title || '(이름 없는 테스트)'}
                         </p>
-                        <span className="text-[10px] text-slate-600 font-mono flex-shrink-0">
+                        <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">
                           {run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)}s` : ''}
                         </span>
                       </div>
@@ -301,7 +292,7 @@ const DashboardPage = () => {
                 </div>
               );
             }) : (
-              <p className="text-slate-500 text-xs italic py-4 text-center">
+              <p className="text-slate-400 text-xs italic py-4 text-center">
                 최근 실행 기록이 없습니다.
               </p>
             )}
@@ -310,7 +301,7 @@ const DashboardPage = () => {
           {recentRuns.length > 0 && (
             <button
               onClick={() => navigate(`/projects/${id}/cases`)}
-              className="mt-3 pt-2.5 border-t border-white/10 w-full text-xs text-slate-400 hover:text-white flex items-center justify-center gap-1 transition-colors"
+              className="mt-3 pt-2.5 border-t border-slate-100 w-full text-xs text-slate-500 hover:text-cyan-700 flex items-center justify-center gap-1 transition-colors"
             >
               전체 보기
               <ArrowUpRight className="w-3 h-3" />
@@ -321,8 +312,6 @@ const DashboardPage = () => {
     </div>
   );
 };
-
-// ─── 컴포넌트 ───
 
 const KpiCard = ({ label, value, Icon, accent }) => (
   <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">

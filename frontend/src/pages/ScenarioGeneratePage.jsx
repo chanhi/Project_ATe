@@ -22,7 +22,6 @@ const TECHNIQUES = [
   { id: 'state_transition',      label: '상태 전이',     desc: '상태 변화' },
 ];
 
-// 생성 진행 단계 (실제 백엔드는 비동기지만, 사용자 체감을 위한 시각화)
 const PROGRESS_STEPS = [
   { label: '요구사항 분석 중', duration: 800 },
   { label: '테스트 포인트 추출 중', duration: 1500 },
@@ -69,7 +68,6 @@ const ScenarioGeneratePage = () => {
     );
   };
 
-  // 예상 시간 계산 (대략 케이스당 2초 + 셋업 3초)
   const estimatedSeconds = requestedCount * 2 + 3;
 
   const runProgressAnimation = async () => {
@@ -92,7 +90,6 @@ const ScenarioGeneratePage = () => {
     setIsGenerating(true);
     setProgressStep(0);
 
-    // 진행 애니메이션을 백그라운드로 시작
     const animationPromise = runProgressAnimation();
 
     try {
@@ -105,9 +102,7 @@ const ScenarioGeneratePage = () => {
         requested_count: requestedCount,
       });
 
-      // 애니메이션 끝나기 전이면 잠깐 기다림 (체감 자연스럽게)
       await animationPromise;
-
       navigate(`/projects/${id}/cases`);
     } catch (error) {
       console.error("생성 실패:", error);
@@ -118,15 +113,14 @@ const ScenarioGeneratePage = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-6 animate-in fade-in duration-500">
-      {/* 헤더 - 컴팩트 */}
+    <div className="max-w-4xl mx-auto py-2 animate-in fade-in duration-300">
       <header className="mb-5">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">시나리오 생성</h2>
           {baseUrl && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 rounded-md">
-              <Globe className="w-3 h-3 text-indigo-500" strokeWidth={2.2} />
-              <span className="text-[11px] font-mono text-indigo-600">{baseUrl}</span>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 rounded-md border border-cyan-200/70">
+              <Globe className="w-3 h-3 text-cyan-700" strokeWidth={2.2} />
+              <span className="text-[11px] font-mono text-cyan-800">{baseUrl}</span>
             </div>
           )}
         </div>
@@ -137,10 +131,10 @@ const ScenarioGeneratePage = () => {
         </p>
       </header>
 
-      {/* 요구사항 입력 (높이 축소) */}
-      <div className="bg-white rounded-xl p-5 border border-slate-300 mb-3 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10 transition-all">
+      {/* 요구사항 입력 */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 mb-3 focus-within:border-cyan-700 focus-within:ring-2 focus-within:ring-cyan-700/10 transition-all">
         {documentId && (
-          <div className="mb-3 px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-md text-[11px] font-bold inline-flex items-center gap-1.5">
+          <div className="mb-3 px-2.5 py-1 bg-cyan-50 text-cyan-800 rounded-md text-[11px] font-bold inline-flex items-center gap-1.5 border border-cyan-200/70">
             <FileText className="w-3 h-3" strokeWidth={2.2} />
             연결된 문서: <span className="font-mono">{documentId}</span>
           </div>
@@ -164,14 +158,14 @@ const ScenarioGeneratePage = () => {
         </div>
       </div>
 
-      {/* 테스트 기법 (compact card) */}
+      {/* 테스트 기법 */}
       <div className="bg-white rounded-xl p-5 border border-slate-200 mb-3">
         <div className="flex items-center justify-between mb-3">
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
             Test Techniques
           </label>
           <span className="text-[11px] text-slate-500">
-            <span className="font-bold text-indigo-600">{selectedTechniques.length}</span> 개 선택됨
+            <span className="font-bold text-cyan-700">{selectedTechniques.length}</span> 개 선택됨
           </span>
         </div>
 
@@ -184,22 +178,22 @@ const ScenarioGeneratePage = () => {
                 onClick={() => toggleTechnique(tech.id)}
                 className={`group p-2.5 rounded-lg text-left transition-all border relative ${
                   isSelected
-                    ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400'
-                    : 'bg-white border-slate-200 hover:border-indigo-200 hover:bg-slate-50'
+                    ? 'bg-cyan-50/50 border-cyan-700 ring-1 ring-cyan-700/30'
+                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 {isSelected && (
-                  <div className="absolute top-2 right-2 w-3.5 h-3.5 bg-indigo-600 rounded-full flex items-center justify-center">
+                  <div className="absolute top-2 right-2 w-3.5 h-3.5 bg-cyan-700 rounded-full flex items-center justify-center">
                     <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
                   </div>
                 )}
                 <p className={`font-bold text-xs mb-0.5 ${
-                  isSelected ? 'text-indigo-700' : 'text-slate-800'
+                  isSelected ? 'text-cyan-900' : 'text-slate-800'
                 }`}>
                   {tech.label}
                 </p>
                 <p className={`text-[10.5px] ${
-                  isSelected ? 'text-indigo-500' : 'text-slate-500'
+                  isSelected ? 'text-cyan-700' : 'text-slate-500'
                 }`}>
                   {tech.desc}
                 </p>
@@ -209,7 +203,7 @@ const ScenarioGeneratePage = () => {
         </div>
       </div>
 
-      {/* 개수 + 생성 버튼 (한 줄) */}
+      {/* 개수 + 생성 버튼 */}
       <div className="bg-white rounded-xl p-5 border border-slate-200 mb-3 flex items-center justify-between flex-wrap gap-4">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
@@ -242,7 +236,7 @@ const ScenarioGeneratePage = () => {
           className={`px-5 py-2.5 rounded-lg font-bold text-sm text-white transition-all flex items-center gap-2 ${
             isGenerating
               ? 'bg-slate-300 cursor-not-allowed'
-              : 'bg-slate-900 hover:bg-indigo-600 active:scale-[0.98]'
+              : 'bg-slate-900 hover:bg-cyan-700 active:scale-[0.98]'
           }`}
         >
           {isGenerating ? (
@@ -260,11 +254,11 @@ const ScenarioGeneratePage = () => {
         </button>
       </div>
 
-      {/* 진행 흐름 (생성 중일 때만) */}
+      {/* 진행 흐름 */}
       {isGenerating && (
-        <div className="bg-slate-900 rounded-xl p-5 mb-3 animate-in slide-in-from-bottom-2 duration-300">
+        <div className="bg-white rounded-xl p-5 mb-3 border border-slate-200 animate-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-bold text-white">생성 진행 상태</h3>
+            <h3 className="text-xs font-bold text-slate-900">생성 진행 상태</h3>
             <span className="text-[10px] text-slate-500 font-mono">
               STEP {progressStep + 1} / {PROGRESS_STEPS.length}
             </span>
@@ -281,20 +275,20 @@ const ScenarioGeneratePage = () => {
                         <Check className="w-3 h-3 text-white" strokeWidth={3} />
                       </div>
                     ) : isActive ? (
-                      <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-cyan-700 animate-spin" />
                     ) : (
-                      <div className="w-5 h-5 rounded-full border border-slate-700" />
+                      <div className="w-5 h-5 rounded-full border border-slate-300" />
                     )}
                   </div>
                   <span className={
                     isDone ? 'text-slate-400 line-through' :
-                    isActive ? 'text-white font-bold' :
-                    'text-slate-600'
+                    isActive ? 'text-slate-900 font-bold' :
+                    'text-slate-400'
                   }>
                     {step.label}
                   </span>
                   {isActive && (
-                    <span className="ml-auto text-[10px] text-indigo-400 font-mono">
+                    <span className="ml-auto text-[10px] text-cyan-700 font-mono">
                       processing...
                     </span>
                   )}
@@ -305,13 +299,12 @@ const ScenarioGeneratePage = () => {
         </div>
       )}
 
-      {/* 컴팩트 안내 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
-        <div className="bg-emerald-50/40 px-3 py-2 rounded-md border border-emerald-100 flex items-center gap-2 text-[11.5px] text-emerald-700">
+        <div className="bg-emerald-50/40 px-3 py-2 rounded-md border border-emerald-200/70 flex items-center gap-2 text-[11.5px] text-emerald-700">
           <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2.2} />
           구체적인 입력일수록 정확한 케이스가 생성됩니다.
         </div>
-        <div className="bg-amber-50/40 px-3 py-2 rounded-md border border-amber-100 flex items-center gap-2 text-[11.5px] text-amber-700">
+        <div className="bg-amber-50/40 px-3 py-2 rounded-md border border-amber-200/70 flex items-center gap-2 text-[11.5px] text-amber-700">
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2.2} />
           요청 개수보다 적게 생성될 수 있습니다.
         </div>

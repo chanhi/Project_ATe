@@ -52,7 +52,6 @@ const ProjectListPage = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // 검색 필터
   const filteredProjects = useMemo(() => {
     if (!searchQuery.trim()) return projects;
     const q = searchQuery.toLowerCase();
@@ -63,7 +62,6 @@ const ProjectListPage = () => {
     );
   }, [projects, searchQuery]);
 
-  // 전체 통계
   const globalStats = useMemo(() => {
     const totalCases = projects.reduce((s, p) => s + (p.case_count || 0), 0);
     const totalRuns = projects.reduce((s, p) => s + (p.total_runs || 0), 0);
@@ -72,7 +70,6 @@ const ProjectListPage = () => {
     return { totalCases, totalRuns, avgPassRate };
   }, [projects]);
 
-  // 모달 핸들러
   const openCreateModal = () => {
     setFormData({ name: '', base_url: '', description: '' });
     setModal('create');
@@ -149,7 +146,6 @@ const ProjectListPage = () => {
     }
   };
 
-  // 헬퍼
   const formatRelative = (iso) => {
     if (!iso) return null;
     const mins = Math.floor((new Date() - new Date(iso)) / 60000);
@@ -178,20 +174,15 @@ const ProjectListPage = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      {/* 좌측정렬 utility 헤더 */}
       <header className="mb-5">
-        <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Projects</h1>
-            <p className="text-slate-500 mt-0.5 text-sm">
-              {projects.length} active project{projects.length !== 1 ? 's' : ''}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Projects</h1>
+          <p className="text-slate-500 mt-0.5 text-sm">
+            {projects.length} active project{projects.length !== 1 ? 's' : ''}
+          </p>
         </div>
 
-        {/* 통계 + 검색 + 생성 한 줄 */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          {/* 글로벌 통계 */}
           {projects.length > 0 && (
             <div className="flex items-center gap-4 text-xs">
               <StatChip label="Tests" value={globalStats.totalCases} />
@@ -202,7 +193,6 @@ const ProjectListPage = () => {
 
           <div className="flex-1 min-w-[200px]" />
 
-          {/* 검색 */}
           <div className="relative w-64">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" strokeWidth={2.2} />
             <input
@@ -210,13 +200,13 @@ const ProjectListPage = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="프로젝트 검색"
-              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-700 focus:ring-2 focus:ring-cyan-700/10"
             />
           </div>
 
           <button
             onClick={openCreateModal}
-            className="bg-slate-900 text-white px-3.5 py-2 rounded-lg font-bold text-sm hover:bg-indigo-600 transition-all shadow-sm flex items-center gap-1.5"
+            className="bg-slate-900 text-white px-3.5 py-2 rounded-lg font-bold text-sm hover:bg-cyan-700 transition-all flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
             New Project
@@ -230,7 +220,7 @@ const ProjectListPage = () => {
           <p className="text-slate-500 font-semibold mb-4">아직 프로젝트가 없습니다.</p>
           <button
             onClick={openCreateModal}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-indigo-700 inline-flex items-center gap-1.5"
+            className="bg-cyan-700 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-cyan-800 inline-flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
             첫 프로젝트 만들기
@@ -256,7 +246,6 @@ const ProjectListPage = () => {
         </div>
       )}
 
-      {/* ─── 모달 ─── */}
       {(modal === 'create' || modal === 'edit') && (
         <Modal onClose={() => !submitting && setModal(null)}>
           <div className="flex justify-between items-start mb-5">
@@ -302,7 +291,7 @@ const ProjectListPage = () => {
                 onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
                 placeholder="이 프로젝트가 테스트하는 기능 설명"
                 rows={3}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 leading-relaxed outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-400 resize-none text-sm"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 leading-relaxed outline-none focus:ring-2 focus:ring-cyan-700/10 focus:border-cyan-700 resize-none text-sm"
               />
             </div>
           </div>
@@ -318,7 +307,7 @@ const ProjectListPage = () => {
             <button
               onClick={modal === 'create' ? handleCreate : handleEdit}
               disabled={submitting}
-              className="py-2.5 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-indigo-600 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="py-2.5 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
               {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (modal === 'create' ? '생성' : '저장')}
             </button>
@@ -370,7 +359,6 @@ const ProjectListPage = () => {
   );
 };
 
-// ─── 프로젝트 카드 ───
 const ProjectCard = ({ project, onClick, onEdit, onDelete, formatRelative, extractDomain }) => {
   const lastRunPassed = project.last_run_status === 'SUCCESS' || project.last_run_status === 'PASSED';
   const lastRunFailed = project.last_run_status === 'FAILED' || project.last_run_status === 'FAILURE' || project.last_run_status === 'ERROR';
@@ -379,23 +367,22 @@ const ProjectCard = ({ project, onClick, onEdit, onDelete, formatRelative, extra
   return (
     <div
       onClick={onClick}
-      className="group bg-white rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer overflow-hidden"
+      className="group bg-white rounded-xl border border-slate-200 hover:border-cyan-700/40 hover:shadow-sm hover:-translate-y-0.5 transition-all cursor-pointer overflow-hidden"
     >
-      {/* 상단: 상태 badge */}
       <div className="px-4 pt-3.5 pb-2 flex items-center justify-between">
         {isActive ? (
           lastRunPassed ? (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold border border-emerald-200/70">
               <CheckCircle2 className="w-2.5 h-2.5" strokeWidth={2.5} />
               Last run passed
             </span>
           ) : lastRunFailed ? (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-[10px] font-bold">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-[10px] font-bold border border-red-200/70">
               <XCircle className="w-2.5 h-2.5" strokeWidth={2.5} />
               Last run failed
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-cyan-50 text-cyan-700 rounded text-[10px] font-bold border border-cyan-200/70">
               <Activity className="w-2.5 h-2.5" strokeWidth={2.5} />
               Active
             </span>
@@ -409,7 +396,7 @@ const ProjectCard = ({ project, onClick, onEdit, onDelete, formatRelative, extra
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={onEdit}
-            className="w-6 h-6 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-500 rounded flex items-center justify-center transition-colors"
+            className="w-6 h-6 bg-slate-100 hover:bg-cyan-700 hover:text-white text-slate-500 rounded flex items-center justify-center transition-colors"
             title="수정"
           >
             <Pencil className="w-3 h-3" />
@@ -424,9 +411,8 @@ const ProjectCard = ({ project, onClick, onEdit, onDelete, formatRelative, extra
         </div>
       </div>
 
-      {/* 본문 */}
       <div className="px-4 pb-3">
-        <h3 className="text-base font-black text-slate-900 mb-1 truncate group-hover:text-indigo-600 transition-colors">
+        <h3 className="text-base font-black text-slate-900 mb-1 truncate group-hover:text-cyan-700 transition-colors">
           {project.name}
         </h3>
         <div className="flex items-center gap-1 text-[11px] text-slate-500 mb-2">
@@ -441,18 +427,9 @@ const ProjectCard = ({ project, onClick, onEdit, onDelete, formatRelative, extra
         )}
       </div>
 
-      {/* 메타데이터 그리드 */}
       <div className="px-4 py-2.5 bg-slate-50/70 border-t border-slate-100 grid grid-cols-3 gap-2 text-[11px]">
-        <MetricItem
-          icon={FileText}
-          value={project.case_count || 0}
-          label="Tests"
-        />
-        <MetricItem
-          icon={Activity}
-          value={project.total_runs || 0}
-          label="Runs"
-        />
+        <MetricItem icon={FileText} value={project.case_count || 0} label="Tests" />
+        <MetricItem icon={Activity} value={project.total_runs || 0} label="Runs" />
         {project.pass_rate !== null && project.pass_rate !== undefined ? (
           <MetricItem
             icon={TrendingUp}
@@ -461,15 +438,10 @@ const ProjectCard = ({ project, onClick, onEdit, onDelete, formatRelative, extra
             color={project.pass_rate >= 80 ? 'text-emerald-600' : project.pass_rate >= 50 ? 'text-amber-600' : 'text-red-600'}
           />
         ) : (
-          <MetricItem
-            icon={Clock}
-            value="—"
-            label="Pass"
-          />
+          <MetricItem icon={Clock} value="—" label="Pass" />
         )}
       </div>
 
-      {/* 하단 푸터 */}
       <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
         <span className="flex items-center gap-1">
           <Clock className="w-2.5 h-2.5" strokeWidth={2.2} />
@@ -478,13 +450,11 @@ const ProjectCard = ({ project, onClick, onEdit, onDelete, formatRelative, extra
             : `Created ${project.created_at?.split('T')[0]}`
           }
         </span>
-        <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-indigo-500" strokeWidth={2.2} />
+        <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-cyan-700" strokeWidth={2.2} />
       </div>
     </div>
   );
 };
-
-// ─── 컴포넌트들 ───
 
 const StatChip = ({ label, value, color = 'slate' }) => (
   <div className="flex items-center gap-1.5">
@@ -509,11 +479,11 @@ const MetricItem = ({ icon: Icon, value, label, color = 'text-slate-800' }) => (
 
 const Modal = ({ children, onClose }) => (
   <div
-    className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 z-50 animate-in fade-in duration-150"
+    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6 z-50 animate-in fade-in duration-150"
     onClick={onClose}
   >
     <div
-      className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200"
+      className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-200"
       onClick={(e) => e.stopPropagation()}
     >
       {children}
@@ -532,7 +502,7 @@ const FormField = ({ label, placeholder, value, onChange, autoFocus, mono }) => 
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       autoFocus={autoFocus}
-      className={`w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-400 text-sm ${mono ? 'font-mono' : ''}`}
+      className={`w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 outline-none focus:ring-2 focus:ring-cyan-700/10 focus:border-cyan-700 text-sm ${mono ? 'font-mono' : ''}`}
     />
   </div>
 );

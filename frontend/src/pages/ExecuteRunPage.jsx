@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import client from '../api/client';
 
-// ─── 로그 레벨별 색상 (실제 CLI 도구 컬러 스킴) ───
 const LEVEL_STYLES = {
   INFO:    { color: 'text-slate-300',   tag: 'text-cyan-400',    label: 'INFO ' },
   STEP:    { color: 'text-slate-200',   tag: 'text-blue-400',    label: 'STEP ' },
@@ -24,7 +23,6 @@ const LEVEL_STYLES = {
   DEBUG:   { color: 'text-slate-500',   tag: 'text-slate-500',   label: 'DEBUG' },
 };
 
-// 짧은 시간 포맷 (HH:mm:ss.SSS)
 const formatTime = (date) => {
   const h = String(date.getHours()).padStart(2, '0');
   const m = String(date.getMinutes()).padStart(2, '0');
@@ -33,7 +31,6 @@ const formatTime = (date) => {
   return `${h}:${m}:${s}.${ms}`;
 };
 
-// 백엔드 INFO 메시지에서 STEP/CHECK 자동 추출 (실제 CLI처럼 보이게)
 const detectLevel = (originalLevel, message) => {
   const msg = (message || '').toLowerCase();
   if (originalLevel === 'ERROR' || msg.includes('error')) return 'ERROR';
@@ -52,7 +49,7 @@ const ExecuteRunPage = () => {
   const [testCases, setTestCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
 
-  const [status, setStatus] = useState('ready'); // ready | running | completed | error
+  const [status, setStatus] = useState('ready');
   const [logs, setLogs] = useState([]);
   const [progress, setProgress] = useState(0);
   const [testRunId, setTestRunId] = useState(null);
@@ -63,13 +60,11 @@ const ExecuteRunPage = () => {
   const terminalRef = useRef(null);
   const startTimeRef = useRef(null);
 
-  // ─── 데이터 로드 ───
   useEffect(() => {
     const fetchData = async () => {
       try {
         const projectRes = await client.get(`/api/v1/projects/${id}`);
         setBaseUrl(projectRes.data?.data?.base_url || projectRes.data?.base_url || '');
-
         const casesRes = await client.get(`/api/v1/test-cases?project_id=${id}`);
         const cases = casesRes.data?.data?.items || [];
         setTestCases(Array.isArray(cases) ? cases : []);
@@ -82,14 +77,12 @@ const ExecuteRunPage = () => {
     if (id) fetchData();
   }, [id]);
 
-  // ─── 자동 스크롤 ───
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [logs]);
 
-  // ─── 경과 시간 타이머 ───
   useEffect(() => {
     let timer;
     if (status === 'running' && startTimeRef.current) {
@@ -100,7 +93,6 @@ const ExecuteRunPage = () => {
     return () => clearInterval(timer);
   }, [status]);
 
-  // ─── 로그 추가 헬퍼 ───
   const addLog = useCallback((entry) => {
     const level = detectLevel(entry.level, entry.message);
     setLogs(prev => [...prev, {
@@ -111,15 +103,10 @@ const ExecuteRunPage = () => {
     }]);
   }, []);
 
-  // ─── WebSocket 연결 ───
   const connectWebSocket = useCallback((runId) => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
+    if (wsRef.current) wsRef.current.close();
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/v1/tests/${runId}/logs`;
-
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -130,7 +117,6 @@ const ExecuteRunPage = () => {
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-
         if (msg.type === 'history' && msg.data?.logs) {
           msg.data.logs.forEach(log => addLog(log));
         }
@@ -160,24 +146,16 @@ const ExecuteRunPage = () => {
       }
     };
 
-    ws.onerror = (err) => {
-      console.error('WebSocket error:', err);
+    ws.onerror = () => {
       addLog({ level: 'WARN', message: 'WebSocket error — falling back to polling' });
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket closed');
     };
   }, [addLog, elapsedMs]);
 
-  // ─── 폴링 폴백 (WebSocket 실패 시) ───
   const pollStatus = useCallback(async (runId) => {
     try {
       const response = await client.get(`/api/v1/tests/${runId}`);
       const data = response.data.data;
-
       if (typeof data.progress === 'number') setProgress(data.progress);
-
       if (data.status === 'SUCCESS' || data.status === 'PASSED') {
         setStatus('completed');
         setProgress(100);
@@ -212,24 +190,20 @@ const ExecuteRunPage = () => {
     return () => clearInterval(timer);
   }, [status, testRunId, pollStatus]);
 
-  // ─── 정리 ───
   useEffect(() => {
     return () => {
       if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
-  // ─── 실행 시작 ───
   const handleStartTest = async () => {
     if (!selectedCase) return;
-
     setStatus('running');
     setLogs([]);
     setProgress(0);
     startTimeRef.current = Date.now();
     setElapsedMs(0);
 
-    // CLI 헤더 라인들
     addLog({ level: 'INFO', message: `$ npx playwright test specs/${selectedCase.tc_display_id || 'test_generated'}.spec.ts` });
     addLog({ level: 'INFO', message: `Running test: ${selectedCase.title}` });
     addLog({ level: 'INFO', message: `Target: ${baseUrl}` });
@@ -239,15 +213,11 @@ const ExecuteRunPage = () => {
         `/api/v1/test-cases/${selectedCase.test_case_id}/execute`,
         { test_case_id: selectedCase.test_case_id, target_url: baseUrl }
       );
-
       const { test_run_id } = response.data.data;
       setTestRunId(test_run_id);
       addLog({ level: 'INFO', message: `Run ID: ${test_run_id}` });
       addLog({ level: 'INFO', message: 'Worker accepted — streaming logs...' });
-
-      // WebSocket 연결
       connectWebSocket(test_run_id);
-
     } catch (error) {
       console.error("실행 실패:", error.response?.data);
       setStatus('error');
@@ -261,7 +231,6 @@ const ExecuteRunPage = () => {
     addLog({ level: 'WARN', message: 'Test cancelled by user' });
   };
 
-  // ─── 상태 표시 ───
   const statusInfo = {
     ready:     { dot: 'bg-slate-500',    label: 'IDLE',    color: 'text-slate-500' },
     running:   { dot: 'bg-emerald-500 animate-pulse', label: 'RUNNING', color: 'text-emerald-400' },
@@ -270,25 +239,27 @@ const ExecuteRunPage = () => {
   }[status];
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="mb-8">
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight">테스트 실행</h2>
-        <p className="text-slate-400 mt-2 font-medium">생성된 테스트 케이스를 실행합니다.</p>
-        {baseUrl && (
-          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 bg-indigo-50 rounded-lg">
-            <Globe className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="text-xs font-mono text-indigo-600">{baseUrl}</span>
-          </div>
-        )}
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <header className="mb-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">테스트 실행</h2>
+          {baseUrl && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 rounded-md border border-cyan-200/70">
+              <Globe className="w-3 h-3 text-cyan-700" strokeWidth={2.2} />
+              <span className="text-[11px] font-mono text-cyan-800">{baseUrl}</span>
+            </div>
+          )}
+        </div>
+        <p className="text-slate-500 mt-0.5 text-sm">생성된 테스트 케이스를 실행합니다.</p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 좌측: 테스트 케이스 목록 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* 좌측: 테스트케이스 목록 */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <ListChecks className="w-4 h-4 text-slate-400" />
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+          <div className="bg-white rounded-xl p-4 border border-slate-200">
+            <div className="flex items-center gap-1.5 mb-3">
+              <ListChecks className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                 Test Cases · {testCases.length}
               </h3>
             </div>
@@ -302,9 +273,9 @@ const ExecuteRunPage = () => {
                 <p className="text-slate-400 text-sm mb-3">테스트 케이스가 없습니다.</p>
                 <button
                   onClick={() => navigate(`/projects/${id}/generate`)}
-                  className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-500 inline-flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-cyan-700 text-white text-xs font-bold rounded-md hover:bg-cyan-800 inline-flex items-center gap-1.5"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3 h-3" />
                   생성하기
                 </button>
               </div>
@@ -317,21 +288,25 @@ const ExecuteRunPage = () => {
                       key={tc.test_case_id}
                       onClick={() => setSelectedCase(tc)}
                       disabled={status === 'running'}
-                      className={`w-full text-left p-3 rounded-xl text-sm transition-all ${
+                      className={`w-full text-left p-2.5 rounded-md text-sm transition-all ${
                         isSelected
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                          ? 'bg-cyan-50 border border-cyan-700/40 ring-1 ring-cyan-700/20'
+                          : 'bg-slate-50 hover:bg-slate-100 border border-transparent text-slate-700'
                       } disabled:opacity-50`}
                     >
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-0.5">
                         <span className={`text-[10px] font-mono font-bold ${
-                          isSelected ? 'text-indigo-200' : 'text-indigo-500'
+                          isSelected ? 'text-cyan-700' : 'text-slate-500'
                         }`}>
                           {tc.tc_display_id || tc.test_case_id}
                         </span>
-                        {isSelected && <ChevronRight className="w-3.5 h-3.5" />}
+                        {isSelected && <ChevronRight className="w-3 h-3 text-cyan-700" />}
                       </div>
-                      <p className="font-bold text-sm truncate">{tc.title || '(제목 없음)'}</p>
+                      <p className={`font-bold text-[13px] truncate ${
+                        isSelected ? 'text-cyan-900' : 'text-slate-800'
+                      }`}>
+                        {tc.title || '(제목 없음)'}
+                      </p>
                     </button>
                   );
                 })}
@@ -342,9 +317,8 @@ const ExecuteRunPage = () => {
 
         {/* 우측: 터미널 */}
         <div className="lg:col-span-2">
-          <div className="bg-[#0d1117] rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ minHeight: '600px' }}>
+          <div className="bg-[#0d1117] rounded-xl shadow-sm overflow-hidden flex flex-col border border-slate-300" style={{ minHeight: '600px' }}>
 
-            {/* 터미널 헤더 (실제 IDE 터미널 스타일) */}
             <div className="bg-[#161b22] px-4 py-2 flex items-center justify-between border-b border-[#30363d]">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
@@ -369,7 +343,6 @@ const ExecuteRunPage = () => {
               </div>
             </div>
 
-            {/* 정보 바 */}
             {selectedCase && (
               <div className="bg-[#0d1117] px-4 py-2 border-b border-[#30363d] flex items-center gap-3 text-xs font-mono">
                 <span className="text-[#8b949e]">$</span>
@@ -380,7 +353,6 @@ const ExecuteRunPage = () => {
               </div>
             )}
 
-            {/* 로그 출력 영역 */}
             <div
               ref={terminalRef}
               className="flex-1 overflow-y-auto p-4 font-mono text-[12.5px] leading-[1.7]"
@@ -429,7 +401,6 @@ const ExecuteRunPage = () => {
               )}
             </div>
 
-            {/* 진행률 바 */}
             {status === 'running' && (
               <div className="bg-[#161b22] px-4 py-2 border-t border-[#30363d]">
                 <div className="flex items-center justify-between text-xs font-mono mb-1.5">
@@ -445,7 +416,6 @@ const ExecuteRunPage = () => {
               </div>
             )}
 
-            {/* 하단 액션 바 */}
             <div className="bg-[#161b22] px-4 py-3 border-t border-[#30363d] flex gap-2">
               {status === 'ready' || status === 'completed' || status === 'error' ? (
                 <button
@@ -458,7 +428,7 @@ const ExecuteRunPage = () => {
                   }`}
                 >
                   <Play className="w-3.5 h-3.5" fill="currentColor" />
-                  {status === 'error' ? 'Run again' : status === 'completed' ? 'Run again' : 'Run test'}
+                  {status === 'error' ? '다시 실행' : status === 'completed' ? '다시 실행' : '실행 시작'}
                 </button>
               ) : (
                 <button
@@ -466,7 +436,7 @@ const ExecuteRunPage = () => {
                   className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-red-600 text-white hover:bg-red-500 transition-all flex items-center justify-center gap-2"
                 >
                   <Square className="w-3.5 h-3.5" fill="currentColor" />
-                  Stop
+                  중지
                 </button>
               )}
             </div>
