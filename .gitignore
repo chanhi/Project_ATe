@@ -1,0 +1,57 @@
+# ── 환경변수 (절대 커밋 금지) ──
+.env
+.env.local
+.env.*.local
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# ── 테스트 ──
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ── Docker ──
+*.log
+
+# ── 업로드/내보내기 (로컬 개발) ──
+/tmp/ate-uploads/
+/tmp/ate-exports/
+
+# ── 결과 아티팩트 ──
+allure-results/
+allure-report/
+playwright-report/
+test-results/
+
+# ── DB 덤프 ──
+*.bson
+*.archive
+
+# ── Node ──
+node_modules/
+package-lock.json
+
+# ── Playwright ──
+worker/playwright-runner/test-results/
+worker/playwright-runner/playwright-report/
+worker/playwright-runner/results.json
